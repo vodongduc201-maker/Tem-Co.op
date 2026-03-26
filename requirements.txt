@@ -1,4 +1,6 @@
-tesseract-ocr
-tesseract-ocr-vie
-libgl1
-libglib2.0-0
+streamlit
+pandas
+pytesseract
+opencv-python-headless
+pillow
+openpyxl
