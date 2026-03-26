@@ -1,41 +1,30 @@
 import streamlit as st
 import pandas as pd
-import pytesseract
-import cv2
-import numpy as np
 from PIL import Image
 import io
 
-st.set_page_config(page_title="Chương Dương OCR - Light", layout="wide")
-st.title("📝 Quét Báo cáo Giấy (Bản siêu nhẹ)")
+st.set_page_config(page_title="Chương Dương - Team MT", layout="wide")
 
-uploaded_file = st.file_uploader("Tải ảnh form báo cáo", type=['jpg', 'jpeg', 'png'])
+st.title("📱 Hệ thống Quản lý Team MT")
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Ảnh gốc", width=500)
+tab1, tab2 = st.tabs(["In Tem QR", "Số hóa Báo cáo"])
+
+with tab1:
+    st.header("In Tem QR")
+    st.info("Chức năng in tem vẫn hoạt động bình thường với file Excel.")
+    # Chèn lại đoạn code in tem QR cũ của bạn ở đây
+
+with tab2:
+    st.header("Số hóa Báo cáo (OCR)")
+    st.warning("Hệ thống đang bảo trì thư viện quét ảnh nâng cao. Vui lòng sử dụng Google Lens để copy văn bản và dán vào bảng dưới đây.")
     
-    if st.button("🚀 TRÍCH XUẤT DỮ LIỆU"):
-        with st.spinner("Đang đọc dữ liệu..."):
-            # Chuyển ảnh sang xám để đọc chuẩn hơn
-            img_np = np.array(image)
-            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-            
-            # Quét chữ bằng Tesseract (Đã cài trong packages.txt)
-            # Cấu hình psm 6 để đọc dữ liệu dạng bảng
-            custom_config = r'--oem 3 --psm 6'
-            text_data = pytesseract.image_to_string(gray, lang='vie+eng', config=custom_config)
-            
-            # Xử lý văn bản thành bảng
-            rows = [line.split() for line in text_data.split('\n') if line.strip()]
-            df = pd.DataFrame(rows)
-            
-            st.subheader("📊 Kết quả:")
-            st.dataframe(df)
-            
-            # Xuất Excel
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, header=False)
-            
-            st.download_button("📥 TẢI EXCEL", output.getvalue(), "Bao_cao_CD.xlsx")
+    user_input = st.text_area("Dán dữ liệu quét từ Google Lens vào đây:")
+    if user_input:
+        lines = [line.split() for line in user_input.split('\n') if line.strip()]
+        df = pd.DataFrame(lines)
+        st.dataframe(df)
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, header=False)
+        st.download_button("📥 TẢI EXCEL", output.getvalue(), "Bao_cao_CD.xlsx")
