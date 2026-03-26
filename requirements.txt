@@ -1,5 +1,4 @@
-streamlit
-pandas
-opencv-python-headless
-easyocr
-openpyxl
+tesseract-ocr
+tesseract-ocr-vie
+libgl1
+libglib2.0-0
