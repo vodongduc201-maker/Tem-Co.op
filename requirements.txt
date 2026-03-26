@@ -1,6 +1,3 @@
 streamlit
 pandas
-pytesseract
-opencv-python-headless
-pillow
 openpyxl
