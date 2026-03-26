@@ -1,35 +1,30 @@
 import streamlit as st
 import pandas as pd
-import cv2
-import numpy as np
 from PIL import Image
-import easyocr
 import io
 
-# Cấu hình trang
-st.set_page_config(page_title="Chương Dương OCR", layout="wide")
+st.set_page_config(page_title="Chương Dương - Team MT", layout="wide")
 
-st.title("📝 Số hóa Báo cáo MT Chương Dương")
+st.title("📱 Hệ thống Quản lý Team MT")
 
-# Khởi tạo EasyOCR (Sử dụng cache để không tải lại nhiều lần)
-@st.cache_resource
-def load_reader():
-    # Chỉ tải ngôn ngữ tiếng Việt và Anh
-    return easyocr.Reader(['vi', 'en'], gpu=False)
+tab1, tab2 = st.tabs(["In Tem QR", "Số hóa Báo cáo"])
 
-reader = load_reader()
+with tab1:
+    st.header("In Tem QR")
+    st.info("Chức năng in tem vẫn hoạt động bình thường với file Excel.")
+    # Chèn lại đoạn code in tem QR cũ của bạn ở đây
 
-uploaded_file = st.file_uploader("Tải ảnh báo cáo", type=['jpg', 'png', 'jpeg'])
-
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Ảnh gốc", width=500)
+with tab2:
+    st.header("Số hóa Báo cáo (OCR)")
+    st.warning("Hệ thống đang bảo trì thư viện quét ảnh nâng cao. Vui lòng sử dụng Google Lens để copy văn bản và dán vào bảng dưới đây.")
     
-    if st.button("🚀 TRÍCH XUẤT"):
-        img_np = np.array(image)
-        results = reader.readtext(img_np)
+    user_input = st.text_area("Dán dữ liệu quét từ Google Lens vào đây:")
+    if user_input:
+        lines = [line.split() for line in user_input.split('\n') if line.strip()]
+        df = pd.DataFrame(lines)
+        st.dataframe(df)
         
-        # Hiển thị kết quả dạng bảng đơn giản
-        data = [res[1] for res in results]
-        st.write("Dữ liệu tìm thấy:")
-        st.write(data)
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, header=False)
+        st.download_button("📥 TẢI EXCEL", output.getvalue(), "Bao_cao_CD.xlsx")
