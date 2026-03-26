@@ -80,4 +80,4 @@ if df_master is not None:
         st.download_button("📥 TẢI EXCEL (BẢN NHÁP)", output.getvalue(), f"BC_{st_selected}.xlsx")
 
 st.markdown("---")
-st.caption("©
+st.caption("© 2026 Chương Dương Beverage - Team MT")
