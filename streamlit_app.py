@@ -5,55 +5,51 @@ import cv2
 import numpy as np
 from PIL import Image
 import io
-import re
 
-st.set_page_config(page_title="Chương Dương OCR - Trực tiếp", page_icon="📸")
+st.set_page_config(page_title="Chương Dương OCR Pro", layout="wide")
+st.title("📸 Số hóa Báo cáo MT (Bản nâng cao)")
 
-st.title("📸 Quét Báo cáo trực tiếp từ Ảnh")
-st.info("Tải ảnh form báo cáo Facing/Tồn kho lên, hệ thống sẽ tự chuyển thành bảng.")
-
-uploaded_file = st.file_uploader("Chọn ảnh báo cáo...", type=['jpg', 'jpeg', 'png'])
+uploaded_file = st.file_uploader("Tải ảnh báo cáo lên", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
-    # Hiển thị ảnh
     image = Image.open(uploaded_file)
-    st.image(image, caption="Ảnh đã tải lên", width=500)
+    st.image(image, caption="Ảnh gốc", width=700)
     
-    if st.button("🚀 BẮT ĐẦU QUÉT"):
-        with st.spinner("Đang xử lý dữ liệu..."):
-            # 1. Chuyển ảnh sang OpenCV và làm sạch để AI dễ đọc hơn
-            img_np = np.array(image)
-            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-            # Tăng độ tương phản (Thresholding)
-            gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-
-            # 2. Dùng Tesseract quét chữ tiếng Việt
-            # Cấu hình --psm 6 (Assume a single uniform block of text)
-            custom_config = r'--oem 3 --psm 6'
-            text_data = pytesseract.image_to_string(gray, lang='vie', config=custom_config)
-
-            # 3. Xử lý văn bản thành bảng
+    if st.button("🚀 BẮT ĐẦU XỬ LÝ"):
+        with st.spinner("Đang làm sạch ảnh và đọc dữ liệu..."):
+            # 1. Chuyển sang ảnh xám
+            img = np.array(image)
+            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            
+            # 2. Xử lý khử nhiễu và làm rõ nét chữ viết tay
+            # Dùng Adaptive Thresholding để loại bỏ bóng đổ
+            processed_img = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            
+            # 3. Quét với cấu hình chỉ nhận diện Số và Chữ Tiếng Việt
+            # --psm 6: Coi như một khối văn bản thống nhất
+            custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯưẠạẢảẤấẦầẨẩẪẫẬậẮắẰằẲẳẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰự/ '
+            
+            text_data = pytesseract.image_to_string(processed_img, lang='vie', config=custom_config)
+            
+            # 4. Hậu xử lý: Tách dòng và lọc bỏ ký tự rác
             lines = text_data.split('\n')
-            final_data = []
+            clean_rows = []
             for line in lines:
-                if line.strip():
-                    # Tách chữ và số
+                # Chỉ lấy những dòng có dữ liệu (có độ dài > 5 ký tự)
+                if len(line.strip()) > 5:
                     parts = line.split()
-                    final_data.append(parts)
-
-            if final_data:
-                df = pd.DataFrame(final_data)
-                st.subheader("📊 Kết quả dự kiến:")
-                st.dataframe(df)
-
-                # 4. Xuất file Excel
+                    clean_rows.append(parts)
+            
+            if clean_rows:
+                df = pd.DataFrame(clean_rows)
+                st.subheader("📊 Kết quả sau khi làm sạch:")
+                st.table(df) # Dùng table cho dễ nhìn
+                
+                # Xuất Excel
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
                     df.to_excel(writer, index=False, header=False)
                 
-                st.success("Quét xong!")
-                st.download_button("📥 TẢI EXCEL", output.getvalue(), "Bao_cao_truc_tiep.xlsx")
+                st.download_button("📥 TẢI EXCEL SẠCH", output.getvalue(), "Bao_cao_MT_Clean.xlsx")
             else:
-                st.error("Không đọc được dữ liệu. Hãy thử ảnh rõ nét hơn.")
-
-st.warning("⚠️ Lưu ý: Ảnh chụp cần thẳng, đủ sáng và chữ viết tay rõ ràng để đạt độ chính xác cao nhất.")
+                st.error("Không nhận diện được bảng. Vui lòng chụp ảnh gần và thẳng hơn!")
