@@ -1,95 +1,73 @@
 import streamlit as st
 import pandas as pd
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
-from reportlab.lib.utils import ImageReader
+import easyocr
+import cv2
+import numpy as np
+from PIL import Image
 import io
-import qrcode
-from datetime import datetime
 
-st.set_page_config(page_title="In Tem QR Chuong Duong - Fixed", page_icon="📱")
+st.set_page_config(page_title="Chương Dương - Số hóa Báo cáo Giấy", layout="wide")
+st.title("📝 Chuyển Báo cáo Giấy sang Excel")
+st.info("Dành cho báo cáo Facing/Tồn kho viết tay của nhân viên thị trường.")
 
-def remove_accents(input_str):
-    import unicodedata
-    if not isinstance(input_str, str): return str(input_str)
-    nfkd_form = unicodedata.normalize('NFKD', input_str)
-    return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D')
-
-st.title("📱 Hệ thống In Tem QR - Team MT")
-st.info("Cấu trúc QR: Booking-MãKho-MãST-SốKiện-SốHD")
-
-uploaded_file = st.file_uploader("Tải file Excel (Cấu trúc mới nhất)", type=['xlsx'])
+uploaded_file = st.file_uploader("Tải ảnh chụp báo cáo (Form giấy)", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
-    try:
-        # Đọc dữ liệu và làm sạch tên cột
-        df = pd.read_excel(uploaded_file)
-        df.columns = df.columns.str.strip()
-        df = df.astype(str)
-        
-        if st.button("🚀 XUẤT PDF TẤT CẢ TEM"):
-            buffer = io.BytesIO()
-            c = canvas.Canvas(buffer, pagesize=(4*inch, 2*inch))
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Ảnh báo cáo gốc", width=600)
+    
+    if st.button("🚀 TRÍCH XUẤT DỮ LIỆU"):
+        with st.spinner("AI đang đọc chữ viết tay và phân tích bảng..."):
+            # Chuyển ảnh sang định dạng OpenCV
+            img_np = np.array(image)
+            img_cv = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
             
-            for _, row in df.iterrows():
-                # Lấy dữ liệu theo tiêu đề cột trong ảnh mới nhất của bạn
-                booking = row.get('Mã booking', '').replace(".0", "")
-                ma_kho = row.get('Mã kho', '').replace(".0", "")
-                ma_st = row.get('Mã siêu thị', '').replace(".0", "")
-                so_hd = row.get('Số Hóa Đơn NCC', '').replace(".0", "")
-                ngay_giao = row.get('Ngày giao dự kiến', '').replace(".0", "")
+            # Khởi tạo EasyOCR cho tiếng Việt và tiếng Anh
+            reader = easyocr.Reader(['vi', 'en'])
+            
+            # Đọc dữ liệu từ ảnh (Kết quả gồm: Tọa độ, Nội dung, Độ tin cậy)
+            results = reader.readtext(img_np)
+            
+            # Xử lý logic theo hàng (Sắp xếp các chữ có cùng tung độ Y vào một hàng)
+            # Đây là kỹ thuật quan trọng để tái tạo lại cấu trúc bảng từ ảnh chụp
+            lines = {}
+            threshold = 20  # Khoảng cách sai lệch giữa các chữ trên cùng 1 hàng
+            
+            for (bbox, text, prob) in results:
+                y_center = (bbox[0][1] + bbox[2][1]) / 2
                 
-                # Xử lý số lượng kiện để in số lượng tem tương ứng
-                try:
-                    val_kien = row.get('Số Kiện NCC', '1')
-                    tong_so_kien = int(float(val_kien))
-                    if tong_so_kien <= 0: tong_so_kien = 1
-                except: # Đã thêm dấu hai chấm ở đây để sửa lỗi Syntax
-                    tong_so_kien = 1
-
-                # TẠO NỘI DUNG QR (Đồng nhất cho các kiện cùng lô)
-                qr_content = f"{booking}-{ma_kho}-{ma_st}-{tong_so_kien}-{so_hd}"
+                # Tìm hàng phù hợp
+                found_line = False
+                for line_y in lines.keys():
+                    if abs(y_center - line_y) < threshold:
+                        lines[line_y].append((bbox[0][0], text))
+                        found_line = True
+                        break
+                if not found_line:
+                    lines[y_center] = [(bbox[0][0], text)]
+            
+            # Sắp xếp các hàng từ trên xuống dưới và các cột từ trái sang phải
+            sorted_rows = []
+            for y in sorted(lines.keys()):
+                row = sorted(lines[y], key=lambda x: x[0])
+                sorted_rows.append([item[1] for item in row])
+            
+            # Hiển thị kết quả tạm thời
+            if sorted_rows:
+                df_final = pd.DataFrame(sorted_rows)
                 
-                qr = qrcode.QRCode(version=1, border=1)
-                qr.add_data(qr_content)
-                qr.make(fit=True)
-                img_qr = qr.make_image(fill_color="black", back_color="white").convert('RGB')
-                qr_reader = ImageReader(img_qr)
-
-                # Vòng lặp in số lượng tem
-                for i in range(1, tong_so_kien + 1):
-                    c.setLineWidth(1.2)
-                    c.rect(0.1*inch, 0.1*inch, 3.8*inch, 1.8*inch)
-                    c.line(0.1*inch, 1.45*inch, 3.9*inch, 1.45*inch)
-                    c.line(1.3*inch, 0.55*inch, 1.3*inch, 1.45*inch)
-                    c.line(2.0*inch, 0.55*inch, 2.0*inch, 1.45*inch)
-                    
-                    c.setFont("Helvetica-Bold", 8)
-                    c.drawString(0.2*inch, 1.6*inch, "NCC: CHUONG DUONG BEVERAGE")
-                    c.drawRightString(3.8*inch, 1.6*inch, f"BOOKING: {booking}")
-                    
-                    c.setFont("Helvetica-Bold", 10)
-                    c.drawString(0.2*inch, 1.15*inch, f"MA KHO: {ma_kho}")
-                    c.drawString(0.2*inch, 0.9*inch, f"MA ST: {ma_st}")
-                    
-                    # Số thứ tự kiện
-                    c.setFont("Helvetica-Bold", 24)
-                    c.drawCentredString(1.65*inch, 0.85*inch, f"{i} / {tong_so_kien}")
-                    
-                    c.setFont("Helvetica", 8)
-                    c.drawString(0.2*inch, 0.3*inch, f"GIAO DU KIEN: {ngay_giao}")
-                    
-                    # Chèn QR Code
-                    c.drawImage(qr_reader, 2.1*inch, 0.58*inch, width=1.6*inch, height=0.85*inch, preserveAspectRatio=True)
-                    
-                    # Text dưới QR
-                    c.setFont("Helvetica", 7)
-                    c.drawCentredString(3.0*inch, 0.45*inch, qr_content)
-
-                    c.showPage()
-            
-            c.save()
-            st.download_button("📥 TẢI TEM PDF", buffer.getvalue(), f"Tem_QR_Fixed_{datetime.now().strftime('%d%m')}.pdf")
-            
-    except Exception as e:
-        st.error(f"Lỗi: {e}")
+                st.subheader("📊 Dữ liệu dự kiến trích xuất:")
+                st.dataframe(df_final, use_container_width=True)
+                
+                # Xuất file Excel
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_final.to_excel(writer, index=False, header=False, sheet_name='BaoCaoThiTruong')
+                
+                st.success("Đã trích xuất xong! Bạn có thể tải file về và chỉnh sửa lại các ô chữ viết tay quá mờ.")
+                st.download_button(
+                    label="📥 TẢI FILE EXCEL BÁO CÁO",
+                    data=output.getvalue(),
+                    file_name=f"Bao_cao_giay_{pd.Timestamp.now().strftime('%d%m')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
