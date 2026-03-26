@@ -1,6 +1,5 @@
-streamlit
+easyocr
 pandas
-reportlab
-qrcode
-openpyxl
+opencv-python-headless
 Pillow
+openpyxl
