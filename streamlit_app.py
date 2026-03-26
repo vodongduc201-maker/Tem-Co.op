@@ -1,55 +1,71 @@
 import streamlit as st
 import pandas as pd
-import pytesseract
-import cv2
-import numpy as np
-from PIL import Image
+from datetime import datetime
 import io
 
-st.set_page_config(page_title="Chương Dương OCR Pro", layout="wide")
-st.title("📸 Số hóa Báo cáo MT (Bản nâng cao)")
+st.set_page_config(page_title="Team MT - Nhập Báo Cáo", page_icon="📝")
 
-uploaded_file = st.file_uploader("Tải ảnh báo cáo lên", type=['jpg', 'jpeg', 'png'])
+# 1. Danh sách dữ liệu mẫu (Bạn có thể tự sửa lại theo danh sách thực tế của Chương Dương)
+DS_SIEU_THI = ["Co.op Mart Cống Quỳnh", "Co.op Mart Hùng Vương", "BigC Miền Đông", "WinMart Thảo Điền", "BHX Tân Phú"]
+DS_SAN_PHAM = ["Sá Xị Chương Dương (Lon)", "Sá Xị Zero (Lon)", "Soda Kem (Lon)", "Sá Xị 1.5L (Chai)", "Nước tinh khiết CD"]
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Ảnh gốc", width=700)
+st.title("🥤 Hệ thống Nhập Báo Cáo Thị Trường")
+st.markdown(f"**Ngày thực hiện:** {datetime.now().strftime('%d/%m/%Y')}")
+
+# 2. Giao diện nhập liệu
+with st.form("form_bao_cao", clear_on_submit=True):
+    col1, col2 = st.columns(2)
     
-    if st.button("🚀 BẮT ĐẦU XỬ LÝ"):
-        with st.spinner("Đang làm sạch ảnh và đọc dữ liệu..."):
-            # 1. Chuyển sang ảnh xám
-            img = np.array(image)
-            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-            
-            # 2. Xử lý khử nhiễu và làm rõ nét chữ viết tay
-            # Dùng Adaptive Thresholding để loại bỏ bóng đổ
-            processed_img = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-            
-            # 3. Quét với cấu hình chỉ nhận diện Số và Chữ Tiếng Việt
-            # --psm 6: Coi như một khối văn bản thống nhất
-            custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝàáâãèéêìíòóôõùúýĂăĐđĨĩŨũƠơƯưẠạẢảẤấẦầẨẩẪẫẬậẮắẰằẲẳẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰự/ '
-            
-            text_data = pytesseract.image_to_string(processed_img, lang='vie', config=custom_config)
-            
-            # 4. Hậu xử lý: Tách dòng và lọc bỏ ký tự rác
-            lines = text_data.split('\n')
-            clean_rows = []
-            for line in lines:
-                # Chỉ lấy những dòng có dữ liệu (có độ dài > 5 ký tự)
-                if len(line.strip()) > 5:
-                    parts = line.split()
-                    clean_rows.append(parts)
-            
-            if clean_rows:
-                df = pd.DataFrame(clean_rows)
-                st.subheader("📊 Kết quả sau khi làm sạch:")
-                st.table(df) # Dùng table cho dễ nhìn
-                
-                # Xuất Excel
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False, header=False)
-                
-                st.download_button("📥 TẢI EXCEL SẠCH", output.getvalue(), "Bao_cao_MT_Clean.xlsx")
-            else:
-                st.error("Không nhận diện được bảng. Vui lòng chụp ảnh gần và thẳng hơn!")
+    with col1:
+        sieu_thi = st.selectbox("🏢 Chọn Siêu thị / Cửa hàng:", DS_SIEU_THI)
+    with col2:
+        nhan_vien = st.text_input("👤 Tên nhân viên:")
+
+    st.markdown("---")
+    st.subheader("📦 Số lượng kiểm kê")
+    
+    # Tạo các hàng nhập liệu cho từng sản phẩm
+    data_input = []
+    for sp in DS_SAN_PHAM:
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1:
+            st.write(f"**{sp}**")
+        with c2:
+            facing = st.number_input(f"Facing", min_value=0, step=1, key=f"f_{sp}")
+        with c3:
+            stock = st.number_input(f"Tồn kho", min_value=0, step=1, key=f"s_{sp}")
+        data_input.append({"Sản phẩm": sp, "Facing": facing, "Tồn kho": stock})
+
+    ghi_chu = st.text_area("🗒️ Ghi chú thêm (Khuyến mãi, đối thủ...):")
+    
+    submit = st.form_submit_button("🚀 GỬI BÁO CÁO & XUẤT EXCEL")
+
+# 3. Xử lý sau khi nhấn Gửi
+if submit:
+    if not nhan_vien:
+        st.error("Vui lòng nhập tên nhân viên trước khi gửi!")
+    else:
+        # Tạo DataFrame từ dữ liệu đã nhập
+        df = pd.DataFrame(data_input)
+        df['Siêu thị'] = sieu_thi
+        df['Nhân viên'] = nhan_vien
+        df['Thời gian'] = datetime.now().strftime('%H:%M:%S')
+        df['Ghi chú'] = ghi_chu
+        
+        # Sắp xếp lại thứ tự cột cho đẹp
+        df = df[['Thời gian', 'Nhân viên', 'Siêu thị', 'Sản phẩm', 'Facing', 'Tồn kho', 'Ghi chú']]
+        
+        st.success(f"✅ Đã ghi nhận báo cáo từ {sieu_thi}!")
+        st.dataframe(df)
+
+        # Xuất file Excel để tải về máy ngay lập tức
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Bao_cao_MT')
+        
+        st.download_button(
+            label="📥 TẢI FILE EXCEL VỪA NHẬP",
+            data=output.getvalue(),
+            file_name=f"Bao_cao_{sieu_thi}_{datetime.now().strftime('%d%m')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
