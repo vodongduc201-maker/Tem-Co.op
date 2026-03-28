@@ -17,14 +17,14 @@ def remove_accents(text):
 def load_master_data():
     try:
         # Giu nguyen file co dau de hien thi
-        df_raw = pd.read_excel("data nhan vien.xlsx", header=None)
+        df_raw = pd.read_excel("data nhân viên.xlsx", header=None)
         header_row = 0
         for i in range(len(df_raw)):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
             if "NHÂN VIÊN" in row_str or "HỆ THỐNG" in row_str:
                 header_row = i
                 break
-        df = pd.read_excel("data nhan vien.xlsx", header=header_row)
+        df = pd.read_excel("data nhân viên.xlsx", header=header_row)
         df = df.iloc[:, :4] 
         df.columns = ["NHAN VIEN", "HE THONG", "PHUONG", "TEN SIEU THI"]
         df = df.dropna(subset=["TEN SIEU THI"])
