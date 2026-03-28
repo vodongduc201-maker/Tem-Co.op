@@ -7,28 +7,29 @@ import unicodedata
 # 1. Cau hinh trang
 st.set_page_config(page_title="Team MT - Chuong Duong", layout="wide", page_icon="🥤")
 
-# Ham xoa dau tieng Viet (Dung de xử lý trước khi gửi lên Sheets)
+# Ham xoa dau tieng Viet (Dung de xu ly truoc khi gui len Sheets)
 def remove_accents(text):
     if not isinstance(text, str): return text
-    return ''.join(c for c in unicodedata.normalize('NFD', text)
-                  if unicodedata.category(c) != 'Mn').replace('đ', 'd').replace('Đ', 'D')
+    # Chuan hoa Unicode va loai bo dau
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D')
 
 @st.cache_data
 def load_master_data():
     try:
-        # Giu nguyen file co dau de hien thi
-        df_raw = pd.read_excel("data nhân viên.xlsx", header=None)
+        # Giu nguyen file co dau de hien thi cho anh em de chon
+        # Luu y: Ten file tren Github phai la "data nhan vien.xlsx"
+        df_raw = pd.read_excel("data nhan vien.xlsx", header=None)
         header_row = 0
         for i in range(len(df_raw)):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
             if "NHÂN VIÊN" in row_str or "HỆ THỐNG" in row_str:
                 header_row = i
                 break
-        df = pd.read_excel("data nhân viên.xlsx", header=header_row)
+        df = pd.read_excel("data nhan vien.xlsx", header=header_row)
         df = df.iloc[:, :4] 
         df.columns = ["NHAN VIEN", "HE THONG", "PHUONG", "TEN SIEU THI"]
         df = df.dropna(subset=["TEN SIEU THI"])
-        # Chi xoa khoang trang, GIỮ NGUYÊN DẤU de hien thi tren App
         df = df.map(lambda x: str(x).strip() if pd.notnull(x) else x)
         return df
     except Exception as e:
@@ -37,7 +38,7 @@ def load_master_data():
 
 df_master = load_master_data()
 
-# Danh muc san pham (Hien thi co dau cho dep)
+# Danh muc san pham (Hien thi co dau tren App)
 DS_SAN_PHAM = [
     "Sá Xị Chương Dương (Lon 330ml)",
     "Sá Xị Zero (Lon 330ml)",
@@ -80,7 +81,7 @@ if df_master is not None:
         
         st.divider()
         uploaded_file = st.file_uploader("📸 Ảnh trưng bày:", type=['jpg','png','jpeg'])
-        ghi_chu = st.text_area("🗒️ Ghi chú (Có thể viết có dấu):")
+        ghi_chu = st.text_area("🗒️ Ghi chú (Có thể viết Tiếng Việt):")
         submit = st.form_submit_button("🚀 GỬI BÁO CÁO")
 
     if submit:
@@ -91,18 +92,18 @@ if df_master is not None:
         new_rows_list = []
         for item in all_entries:
             if item["F"] > 0 or item["S"] > 0:
-                # O DAY: Chung ta dung ham remove_accents de xoa dau truoc khi luu
+                # O DAY: Xoa sach dau cua tat ca cac truong du lieu truoc khi gui
                 new_rows_list.append({
-                    "NGAY": ngay,
-                    "GIO": gio,
-                    "NHAN VIEN": remove_accents(nv_selected),
-                    "HE THONG": remove_accents(ht_selected),
-                    "PHUONG": remove_accents(ph_selected),
-                    "SIEU THI": remove_accents(st_selected),
-                    "SAN PHAM": remove_accents(item["SP"]),
+                    "NGAY": str(ngay),
+                    "GIO": str(gio),
+                    "NHAN VIEN": remove_accents(str(nv_selected)),
+                    "HE THONG": remove_accents(str(ht_selected)),
+                    "PHUONG": remove_accents(str(ph_selected)),
+                    "SIEU THI": remove_accents(str(st_selected)),
+                    "SAN PHAM": remove_accents(str(item["SP"])),
                     "FACING": str(item["F"]),
                     "TON KHO": str(item["S"]),
-                    "GHI CHU": remove_accents(ghi_chu),
+                    "GHI CHU": remove_accents(str(ghi_chu)),
                     "HINH ANH": "CO" if uploaded_file else "KHONG"
                 })
         
@@ -110,23 +111,25 @@ if df_master is not None:
             st.warning("⚠️ Bạn chưa nhập số liệu!")
         else:
             try:
+                # Doc du lieu va ep kieu String ngay tu dau
                 existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-                new_data_df = pd.DataFrame(new_rows_list)
+                new_data_df = pd.DataFrame(new_rows_list).astype(str)
                 
                 if existing_data is not None and not existing_data.empty:
-                    existing_data = existing_data.dropna(axis=1, how='all')
+                    existing_data = existing_data.astype(str).dropna(axis=1, how='all')
                     updated_df = pd.concat([existing_data, new_data_df], ignore_index=True)
                 else:
                     updated_df = new_data_df
                 
-                # Ep tat ca ve string de bao dam khong loi encoding
-                updated_df = updated_df.astype(str)
+                # Gui du lieu len Sheet
                 conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
                 
-                st.success(f"✅ Đã gửi báo cáo thành công (Dữ liệu đã được chuẩn hóa không dấu)!")
+                st.success(f"✅ Đã lưu báo cáo thành công!")
                 st.balloons()
             except Exception as e:
-                st.error(f"❌ Lỗi gửi dữ liệu: {str(e)}")
+                # Hien thi loi chi tiet neu co
+                st.error(f"❌ Lỗi hệ thống: {str(e)}")
+                st.info("💡 Mẹo: Hãy chắc chắn tiêu đề trên Google Sheets là KHÔNG DẤU (NGAY, GIO, NHAN VIEN...).")
 
 st.markdown("---")
 st.caption("© 2026 Chuong Duong Beverage")
