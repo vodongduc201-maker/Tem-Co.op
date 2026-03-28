@@ -85,50 +85,51 @@ if df_master is not None:
         
         submit = st.form_submit_button("🚀 GỬI BÁO CÁO VỀ TỔNG")
 
-    if submit:
-       if submit:
-        # 1. Tạo DataFrame dòng mới
+   if submit:
+        # 1. Tạo bản ghi mới (Đảm bảo định dạng String ngay từ đầu)
         time_now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
-        # Chuyển dữ liệu sang chuỗi và đảm bảo xử lý tiếng Việt
-        summary_facing = ", ".join([f"{d['Sản phẩm']}: {d['Facing']}" for d in data_input])
-        summary_ton = ", ".join([f"{d['Sản phẩm']}: {d['Tồn']}" for d in data_input])
+        # Gom dữ liệu Facing và Tồn thành chuỗi văn bản
+        summary_facing = "; ".join([f"{d['Sản phẩm']}: {d['Facing']}" for d in data_input])
+        summary_ton = "; ".join([f"{d['Sản phẩm']}: {d['Tồn']}" for d in data_input])
         
-        # Tạo bản ghi mới dưới dạng Dictionary trước
+        # Tạo Dictionary dữ liệu
         new_entry = {
-            "Thời gian": time_now,
-            "Nhân viên": nv_selected,
-            "Hệ thống": ht_selected,
-            "Siêu thị": st_selected,
-            "Chi tiết Facing": summary_facing,
-            "Chi tiết Tồn": summary_ton,
-            "Ghi chú": ghi_chu,
-            "Có ảnh": "CÓ" if uploaded_file else "KHÔNG"
+            "Thời gian": str(time_now),
+            "Nhân viên": str(nv_selected),
+            "Hệ thống": str(ht_selected),
+            "Siêu thị": str(st_selected),
+            "Facing": str(summary_facing),
+            "Tồn kho": str(summary_ton),
+            "Ghi chú": str(ghi_chu),
+            "Ảnh": "CÓ" if uploaded_file else "KHÔNG"
         }
         
         new_row = pd.DataFrame([new_entry])
 
         try:
-            # 2. Đọc dữ liệu cũ (Sử dụng thêm tham số lọc để tránh lỗi encoding)
+            # 2. Đọc dữ liệu cũ (Sử dụng ttl=0 để tránh cache lỗi)
+            # Nếu Sheet chưa có gì, conn.read sẽ trả về DF trống với các cột chuẩn
             existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
             
-            # Nếu Sheet trống, tạo header mới
-            if existing_data is None or existing_data.empty:
-                updated_df = new_row
-            else:
-                # 3. Kết hợp cũ và mới
+            # 3. Kết hợp dữ liệu (Ép kiểu về object/str để tránh lỗi Encode)
+            if existing_data is not None and not existing_data.empty:
                 updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+            else:
+                updated_df = new_row
             
-            # 4. Cập nhật lại Sheet (Ép kiểu dữ liệu về String để an toàn cho tiếng Việt)
-            updated_df = updated_df.astype(str)
+            # --- BƯỚC QUAN TRỌNG: ÉP KIỂU UTF-8 ---
+            updated_df = updated_df.astype(str) 
+            
+            # 4. Ghi đè lại toàn bộ Sheet bằng hàm update
             conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
             
-            st.success("✅ Tuyệt vời! Dữ liệu đã được gửi thành công.")
+            st.success(f"✅ Đã gửi báo cáo: {st_selected} thành công!")
             st.balloons()
             
         except Exception as e:
-            # Nếu vẫn lỗi encoding, thử cách đẩy dữ liệu thô
-            st.error(f"❌ Lỗi hệ thống: {e}")
+            st.error(f"❌ Lỗi hệ thống: {str(e)}")
+            st.warning("Gợi ý: Hãy kiểm tra dòng tiêu đề trên Google Sheets có khớp với code không (Thời gian, Nhân viên, Hệ thống, Siêu thị, Facing, Tồn kho, Ghi chú, Ảnh).")}")
             st.info("💡 Mẹo: Bạn hãy kiểm tra xem tên các cột trên Google Sheets có dấu hay không. Tốt nhất nên gõ tiêu đề cột sẵn trên Sheet.")
 
     
