@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
 from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Team MT - Báo Cáo Tổng", layout="wide", page_icon="🥤")
 
+# --- 1. ĐỌC MASTER DATA ---
 @st.cache_data
 def load_master_data():
     try:
@@ -35,6 +35,7 @@ DS_SAN_PHAM = [
     "Nước Tinh Khiết CD (Chai 500ml)"
 ]
 
+# --- 2. KẾT NỐI ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 if df_master is not None:
@@ -69,8 +70,8 @@ if df_master is not None:
         ghi_chu = st.text_area("🗒️ Ghi chú:")
         submit = st.form_submit_button("🚀 GỬI BÁO CÁO")
 
-    # ĐOẠN NÀY ĐÃ SỬA LỖI THỤT LỀ (INDENTATION)
     if submit:
+        # BƯỚC QUAN TRỌNG: Tạo data và ép kiểu string ngay lập tức
         time_now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         s_facing = "; ".join([f"{d['Sản phẩm']}: {d['Facing']}" for d in data_input])
         s_ton = "; ".join([f"{d['Sản phẩm']}: {d['Tồn']}" for d in data_input])
@@ -87,19 +88,27 @@ if df_master is not None:
         }])
 
         try:
-            # Đọc và ghi đè dữ liệu (Fix lỗi tiếng Việt bằng cách ép kiểu str)
+            # 1. Đọc dữ liệu hiện tại
             existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+            
+            # 2. Gộp dữ liệu mới vào
             if existing_data is not None and not existing_data.empty:
                 updated_df = pd.concat([existing_data, new_row], ignore_index=True)
             else:
                 updated_df = new_row
             
+            # 3. ÉP KIỂU TOÀN BỘ SANG STRING VÀ CHUẨN HÓA (Fix lỗi ASCII)
             updated_df = updated_df.astype(str)
+            
+            # 4. Ghi đè bằng phương thức update
             conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
+            
             st.success(f"✅ Đã gửi báo cáo {st_selected} thành công!")
             st.balloons()
+            
         except Exception as e:
             st.error(f"❌ Lỗi: {str(e)}")
+            st.info("💡 Mẹo cuối cùng: Hãy thử đổi tiêu đề cột trên Google Sheets thành KHÔNG DẤU (Ví dụ: Thoi gian, Nhan vien, Sieu thi...)")
 
 st.markdown("---")
 st.caption("© 2026 Chương Dương Beverage")
