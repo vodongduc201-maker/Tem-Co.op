@@ -3,112 +3,122 @@ import pandas as pd
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-st.set_page_config(page_title="Team MT - Báo Cáo Tổng", layout="wide", page_icon="🥤")
+# 1. Cau hinh trang
+st.set_page_config(page_title="Team MT - Chuong Duong", layout="wide", page_icon="🥤")
 
-# --- 1. ĐỌC MASTER DATA ---
+# Ham xoa dau tieng Viet
+def remove_accents(text):
+    import unicodedata
+    if not isinstance(text, str): return text
+    return ''.join(c for c in unicodedata.normalize('NFD', text)
+                  if unicodedata.category(c) != 'Mn').replace('đ', 'd').replace('Đ', 'D')
+
 @st.cache_data
 def load_master_data():
     try:
-        df_raw = pd.read_excel("data nhân viên.xlsx", header=None)
+        # Luu y: Ten file phai khop voi GitHub cua ban
+        df_raw = pd.read_excel("data nhan vien.xlsx", header=None)
         header_row = 0
         for i in range(len(df_raw)):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
-            if "NHÂN VIÊN" in row_str or "HỆ THỐNG" in row_str:
+            if "NHAN VIEN" in row_str or "HE THONG" in row_str:
                 header_row = i
                 break
-        df = pd.read_excel("data nhân viên.xlsx", header=header_row)
+        df = pd.read_excel("data nhan vien.xlsx", header=header_row)
         df = df.iloc[:, :4] 
-        df.columns = ["NHÂN VIÊN", "HỆ THỐNG", "PHƯỜNG", "TÊN SIÊU THỊ"]
-        df = df.dropna(subset=["TÊN SIÊU THỊ"])
-        df = df.map(lambda x: str(x).strip().upper() if pd.notnull(x) else x)
+        df.columns = ["NHAN VIEN", "HE THONG", "PHUONG", "TEN SIEU THI"]
+        df = df.dropna(subset=["TEN SIEU THI"])
+        df = df.map(lambda x: remove_accents(str(x)).strip().upper() if pd.notnull(x) else x)
         return df
     except: return None
 
 df_master = load_master_data()
 
+# Danh muc san pham (Khong dau)
 DS_SAN_PHAM = [
-    "Sá Xị Chương Dương (Lon 330ml)",
-    "Sá Xị Zero (Lon 330ml)",
-    "Sá Xị Chương Dương (Chai PET 390ml)",
-    "Soda Kem (Lon 330ml)",
-    "Sá Xị Chương Dương (Chai 1.5L)",
-    "Nước Tinh Khiết CD (Chai 500ml)"
+    "SA XI CHUONG DUONG (LON 330ML)",
+    "SA XI ZERO (LON 330ML)",
+    "SA XI CHUONG DUONG (PET 390ML)",
+    "SODA KEM (LON 330ML)",
+    "SA XI CHUONG DUONG (CHAI 1.5L)",
+    "NUOC TINH KHIET CD (CHAI 500ML)"
 ]
 
-# --- 2. KẾT NỐI ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 if df_master is not None:
     with st.sidebar:
-        st.header("👤 Định danh công tác")
-        list_nv = sorted([x for x in df_master["NHÂN VIÊN"].unique() if x not in ['NAN', 'NONE']])
-        nv_selected = st.selectbox("1. Nhân viên:", list_nv)
-        df_f1 = df_master[df_master["NHÂN VIÊN"] == nv_selected]
-        list_ht = sorted([x for x in df_f1["HỆ THỐNG"].unique() if x not in ['NAN', 'NONE']])
-        ht_selected = st.selectbox("2. Hệ thống:", list_ht)
-        df_f2 = df_f1[df_f1["HỆ THỐNG"] == ht_selected]
-        list_ph = sorted([x for x in df_f2["PHƯỜNG"].unique() if x not in ['NAN', 'NONE']])
-        ph_selected = st.selectbox("3. Phường:", list_ph)
-        df_f3 = df_f2[df_f2["PHƯỜNG"] == ph_selected]
-        list_st = sorted([x for x in df_f3["TÊN SIÊU THỊ"].unique() if x not in ['NAN', 'NONE']])
-        st_selected = st.selectbox("4. Siêu thị:", list_st)
+        st.header("👤 THONG TIN")
+        list_nv = sorted([x for x in df_master["NHAN VIEN"].unique() if x not in ['NAN', 'NONE']])
+        nv_selected = st.selectbox("1. Nhan vien:", list_nv)
+        df_f1 = df_master[df_master["NHAN VIEN"] == nv_selected]
+        
+        list_ht = sorted([x for x in df_f1["HE THONG"].unique() if x not in ['NAN', 'NONE']])
+        ht_selected = st.selectbox("2. He thong:", list_ht)
+        df_f2 = df_f1[df_f1["HE THONG"] == ht_selected]
+        
+        list_ph = sorted([x for x in df_f2["PHUONG"].unique() if x not in ['NAN', 'NONE']])
+        ph_selected = st.selectbox("3. Phuong:", list_ph)
+        
+        df_f3 = df_f2[df_f2["PHUONG"] == ph_selected]
+        st_selected = st.selectbox("4. Sieu thi:", sorted(df_f3["TEN SIEU THI"].unique()))
 
     st.title(f"🥤 {st_selected}")
     
     with st.form("entry_form", clear_on_submit=True):
-        st.subheader("📊 Số liệu trưng bày & Tồn kho")
-        data_input = []
+        st.subheader("📊 NHAP SO LIEU")
+        # Luu tru du lieu nhap theo tung san pham
+        all_entries = []
         for sp in DS_SAN_PHAM:
-            c1, c2, c3 = st.columns([3, 1, 1])
-            with c1: st.write(f"**{sp}**")
-            with c2: f = st.number_input("Facing", min_value=0, step=1, key=f"f_{sp}")
-            with c3: s = st.number_input("Tồn", min_value=0, step=1, key=f"s_{sp}")
-            data_input.append({"Sản phẩm": sp, "Facing": f, "Tồn": s})
+            st.write(f"**{sp}**")
+            c1, c2 = st.columns(2)
+            with c1: f = st.number_input(f"Facing", min_value=0, step=1, key=f"f_{sp}")
+            with c2: s = st.number_input(f"Ton kho", min_value=0, step=1, key=f"s_{sp}")
+            all_entries.append({"SP": sp, "F": f, "S": s})
         
         st.divider()
-        uploaded_file = st.file_uploader("📸 Tải ảnh trưng bày:", type=['jpg','png','jpeg'])
-        ghi_chu = st.text_area("🗒️ Ghi chú:")
-        submit = st.form_submit_button("🚀 GỬI BÁO CÁO")
+        uploaded_file = st.file_uploader("📸 Anh trung bay:", type=['jpg','png','jpeg'])
+        ghi_chu = st.text_area("🗒️ Ghi chu (Khong dau):")
+        submit = st.form_submit_button("🚀 GUI BAO CAO")
 
     if submit:
-        # BƯỚC QUAN TRỌNG: Tạo data và ép kiểu string ngay lập tức
-        time_now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        s_facing = "; ".join([f"{d['Sản phẩm']}: {d['Facing']}" for d in data_input])
-        s_ton = "; ".join([f"{d['Sản phẩm']}: {d['Tồn']}" for d in data_input])
+        now = datetime.now()
+        ngay = now.strftime("%d/%m/%Y")
+        gio = now.strftime("%H:%M:%S")
         
-        new_row = pd.DataFrame([{
-            "Thời gian": str(time_now),
-            "Nhân viên": str(nv_selected),
-            "Hệ thống": str(ht_selected),
-            "Siêu thị": str(st_selected),
-            "Facing": str(s_facing),
-            "Tồn kho": str(s_ton),
-            "Ghi chú": str(ghi_chu),
-            "Có ảnh": "CÓ" if uploaded_file else "KHÔNG"
-        }])
-
-        try:
-            # 1. Đọc dữ liệu hiện tại
-            existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-            
-            # 2. Gộp dữ liệu mới vào
-            if existing_data is not None and not existing_data.empty:
-                updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-            else:
-                updated_df = new_row
-            
-            # 3. ÉP KIỂU TOÀN BỘ SANG STRING VÀ CHUẨN HÓA (Fix lỗi ASCII)
-            updated_df = updated_df.astype(str)
-            
-            # 4. Ghi đè bằng phương thức update
-            conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
-            
-            st.success(f"✅ Đã gửi báo cáo {st_selected} thành công!")
-            st.balloons()
-            
-        except Exception as e:
-            st.error(f"❌ Lỗi: {str(e)}")
-            st.info("💡 Mẹo cuối cùng: Hãy thử đổi tiêu đề cột trên Google Sheets thành KHÔNG DẤU (Ví dụ: Thoi gian, Nhan vien, Sieu thi...)")
-
-st.markdown("---")
-st.caption("© 2026 Chương Dương Beverage")
+        # Tao danh sach cac dong de gui (moi san pham 1 dong de khop voi Google Sheet cua ban)
+        new_rows_list = []
+        for item in all_entries:
+            # Chi gui nhung san pham co nhap lieu (Facing > 0 hoac Ton > 0) de do ton cho file
+            if item["F"] > 0 or item["S"] > 0:
+                new_rows_list.append({
+                    "NGAY": ngay,
+                    "GIO": gio,
+                    "NHAN VIEN": str(nv_selected),
+                    "HE THONG": str(ht_selected),
+                    "PHUONG": str(ph_selected),
+                    "SIEU THI": str(st_selected),
+                    "SAN PHAM": str(item["SP"]),
+                    "FACING": int(item["F"]),
+                    "TON KHO": int(item["S"]),
+                    "GHI CHU": remove_accents(ghi_chu),
+                    "HINH ANH": "CO" if uploaded_file else "KHONG"
+                })
+        
+        if not new_rows_list:
+            st.warning("⚠️ Ban chua nhap so lieu cho san pham nao!")
+        else:
+            try:
+                # 1. Doc du lieu cu
+                existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+                new_data_df = pd.DataFrame(new_rows_list)
+                
+                # 2. Gop du lieu
+                if existing_data is not None and not existing_data.empty:
+                    # Loai bo cac cot rong khong xac dinh neu co
+                    existing_data = existing_data.dropna(axis=1, how='all')
+                    updated_df = pd.concat([existing_data, new_data_df], ignore_index=True)
+                else:
+                    updated_df = new_data_df
+                
+                # 3. Cap nhat (astype(str) de
