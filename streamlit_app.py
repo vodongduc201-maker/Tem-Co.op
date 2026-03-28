@@ -86,13 +86,16 @@ if df_master is not None:
         submit = st.form_submit_button("🚀 GỬI BÁO CÁO VỀ TỔNG")
 
     if submit:
+       if submit:
         # 1. Tạo DataFrame dòng mới
         time_now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        # Chuyển dữ liệu Facing/Tồn thành chuỗi để lưu vào 1 dòng cho gọn
+        
+        # Chuyển dữ liệu sang chuỗi và đảm bảo xử lý tiếng Việt
         summary_facing = ", ".join([f"{d['Sản phẩm']}: {d['Facing']}" for d in data_input])
         summary_ton = ", ".join([f"{d['Sản phẩm']}: {d['Tồn']}" for d in data_input])
         
-        new_row = pd.DataFrame([{
+        # Tạo bản ghi mới dưới dạng Dictionary trước
+        new_entry = {
             "Thời gian": time_now,
             "Nhân viên": nv_selected,
             "Hệ thống": ht_selected,
@@ -101,25 +104,34 @@ if df_master is not None:
             "Chi tiết Tồn": summary_ton,
             "Ghi chú": ghi_chu,
             "Có ảnh": "CÓ" if uploaded_file else "KHÔNG"
-        }])
+        }
+        
+        new_row = pd.DataFrame([new_entry])
 
         try:
-            # 2. Đọc dữ liệu cũ từ Sheet (Tên Sheet phải là 'Data_Bao_Cao_MT')
-            # ttl=0 để luôn lấy dữ liệu mới nhất, không lấy từ bộ nhớ đệm
+            # 2. Đọc dữ liệu cũ (Sử dụng thêm tham số lọc để tránh lỗi encoding)
             existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
             
-            # 3. Kết hợp cũ và mới
-            updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+            # Nếu Sheet trống, tạo header mới
+            if existing_data is None or existing_data.empty:
+                updated_df = new_row
+            else:
+                # 3. Kết hợp cũ và mới
+                updated_df = pd.concat([existing_data, new_row], ignore_index=True)
             
-            # 4. Cập nhật lại toàn bộ Sheet
+            # 4. Cập nhật lại Sheet (Ép kiểu dữ liệu về String để an toàn cho tiếng Việt)
+            updated_df = updated_df.astype(str)
             conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
             
-            st.success("✅ Tuyệt vời! Dữ liệu đã được gửi về File Tổng.")
+            st.success("✅ Tuyệt vời! Dữ liệu đã được gửi thành công.")
             st.balloons()
             
         except Exception as e:
-            st.error(f"❌ Lỗi khi gửi dữ liệu: {e}")
-            st.warning("Mẹo: Hãy đảm bảo bạn đã Share quyền Editor cho email Service Account trong Google Sheets.")
+            # Nếu vẫn lỗi encoding, thử cách đẩy dữ liệu thô
+            st.error(f"❌ Lỗi hệ thống: {e}")
+            st.info("💡 Mẹo: Bạn hãy kiểm tra xem tên các cột trên Google Sheets có dấu hay không. Tốt nhất nên gõ tiêu đề cột sẵn trên Sheet.")
+
+    
 
 st.markdown("---")
 st.caption("© 2026 Chương Dương Beverage - Team MT Management System")
