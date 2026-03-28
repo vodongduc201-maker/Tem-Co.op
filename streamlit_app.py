@@ -16,7 +16,7 @@ def remove_accents(text):
 @st.cache_data
 def load_master_data():
     try:
-        # Luu y: Ten file phai khop voi GitHub cua ban
+        # Luu y: Ten file phai khop voi GitHub cua ban (da doi thanh khong dau)
         df_raw = pd.read_excel("data nhan vien.xlsx", header=None)
         header_row = 0
         for i in range(len(df_raw)):
@@ -30,7 +30,8 @@ def load_master_data():
         df = df.dropna(subset=["TEN SIEU THI"])
         df = df.map(lambda x: remove_accents(str(x)).strip().upper() if pd.notnull(x) else x)
         return df
-    except: return None
+    except:
+        return None
 
 df_master = load_master_data()
 
@@ -41,7 +42,7 @@ DS_SAN_PHAM = [
     "SA XI CHUONG DUONG (PET 390ML)",
     "SODA KEM (LON 330ML)",
     "SA XI CHUONG DUONG (CHAI 1.5L)",
-    "NUOC TINH KHIET CD (CHAI 500ML)"
+    "NUOC TINH KHIEP CD (CHAI 500ML)"
 ]
 
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -67,7 +68,6 @@ if df_master is not None:
     
     with st.form("entry_form", clear_on_submit=True):
         st.subheader("📊 NHAP SO LIEU")
-        # Luu tru du lieu nhap theo tung san pham
         all_entries = []
         for sp in DS_SAN_PHAM:
             st.write(f"**{sp}**")
@@ -86,10 +86,8 @@ if df_master is not None:
         ngay = now.strftime("%d/%m/%Y")
         gio = now.strftime("%H:%M:%S")
         
-        # Tao danh sach cac dong de gui (moi san pham 1 dong de khop voi Google Sheet cua ban)
         new_rows_list = []
         for item in all_entries:
-            # Chi gui nhung san pham co nhap lieu (Facing > 0 hoac Ton > 0) de do ton cho file
             if item["F"] > 0 or item["S"] > 0:
                 new_rows_list.append({
                     "NGAY": ngay,
@@ -99,8 +97,8 @@ if df_master is not None:
                     "PHUONG": str(ph_selected),
                     "SIEU THI": str(st_selected),
                     "SAN PHAM": str(item["SP"]),
-                    "FACING": int(item["F"]),
-                    "TON KHO": int(item["S"]),
+                    "FACING": str(item["F"]),
+                    "TON KHO": str(item["S"]),
                     "GHI CHU": remove_accents(ghi_chu),
                     "HINH ANH": "CO" if uploaded_file else "KHONG"
                 })
@@ -115,10 +113,20 @@ if df_master is not None:
                 
                 # 2. Gop du lieu
                 if existing_data is not None and not existing_data.empty:
-                    # Loai bo cac cot rong khong xac dinh neu co
+                    # Loai bo cac cot rong khong xac dinh
                     existing_data = existing_data.dropna(axis=1, how='all')
                     updated_df = pd.concat([existing_data, new_data_df], ignore_index=True)
                 else:
                     updated_df = new_data_df
                 
-                # 3. Cap nhat (astype(str) de
+                # 3. Cap nhat (astype(str) de tranh moi loi encoding)
+                updated_df = updated_df.astype(str)
+                conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
+                
+                st.success(f"✅ Da gui {len(new_rows_list)} dong bao cao!")
+                st.balloons()
+            except Exception as e:
+                st.error(f"❌ Loi gui du lieu: {str(e)}")
+
+st.markdown("---")
+st.caption("© 2026 Chuong Duong Beverage")
