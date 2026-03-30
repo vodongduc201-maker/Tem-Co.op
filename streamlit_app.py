@@ -1,79 +1,113 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+from datetime import datetime
 
-# 1. Cấu hình giao diện rộng để dễ nhìn bảng
-st.set_page_config(page_title="Báo cáo Hệ Thống MT", layout="wide")
+# --- 1. CẤU HÌNH TRANG ---
+st.set_page_config(page_title="Chương Dương - Check Thị Trường", layout="wide")
 
-st.title("📊 Quản lý siêu thị theo phân cấp")
-st.markdown("---")
+st.title("🥤 Công cụ Báo cáo Thị Trường MT")
 
-# 2. Kết nối Google Sheets
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+# --- 2. ĐỌC DANH MỤC TỪ GITHUB (FILE EXCEL) ---
+@st.cache_data(ttl=600)
+def load_master_data():
+    try:
+        # Đọc file excel nằm cùng thư mục trên GitHub
+        df = pd.read_excel("data nhan vien.xlsx")
+        # Chuẩn hóa tên cột: Viết hoa, bỏ khoảng trắng
+        df.columns = [str(c).strip().upper() for c in df.columns]
+        return df
+    except Exception as e:
+        st.error(f"❌ Không tìm thấy file danh mục trên GitHub: {e}")
+        return None
+
+df_master = load_master_data()
+
+# --- 3. KẾT NỐI GOOGLE SHEETS ĐỂ GHI DỮ LIỆU ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# --- 4. GIAO DIỆN ĐIỀU HƯỚNG (BỘ LỌC) ---
+if df_master is not None:
+    st.subheader("🔍 Bước 1: Chọn Thông Tin Điểm Bán")
     
-    # Xử lý làm sạch tên cột (xóa khoảng trắng thừa)
-    df.columns = df.columns.str.strip()
-    
-except Exception as e:
-    st.error(f"❌ Lỗi kết nối Sheets: {e}")
-    st.stop()
+    # Định nghĩa các cột chuẩn
+    C_NV = 'NHAN VIEN'
+    C_HT = 'HE THONG'
+    C_PH = 'PHUONG'
+    C_ST = 'SIEU THI'
 
-# 3. Định nghĩa tên cột chính xác (Bạn hãy sửa chữ trong ngoặc '' nếu Sheets đổi tên)
-COL_NV = 'NHAN VIEN'
-COL_HT = 'HE THONG'
-COL_PH = 'PHUONG'
-COL_ST = 'TEN SIEU THI'
-
-# Kiểm tra xem các cột có tồn tại không để tránh lỗi KeyError
-missing_cols = [c for c in [COL_NV, COL_HT, COL_PH, COL_ST] if c not in df.columns]
-
-if missing_cols:
-    st.warning(f"⚠️ Cảnh báo: Không tìm thấy các cột {missing_cols} trong file Sheets.")
-    st.write("Danh sách cột thực tế đang có:", df.columns.tolist())
-    st.stop()
-
-# 4. Thiết lập Bộ lọc Phân cấp (Cascading Filters)
-with st.container():
     c1, c2, c3, c4 = st.columns(4)
 
-    # Cấp 1: Nhân viên
     with c1:
-        list_nv = sorted(df[COL_NV].dropna().unique())
-        sel_nv = st.multiselect(f"👤 {COL_NV}", list_nv)
-    
-    # Cấp 2: Hệ thống (Lọc theo Nhân viên)
-    df_step1 = df[df[COL_NV].isin(sel_nv)] if sel_nv else df
+        list_nv = sorted(df_master[C_NV].dropna().unique())
+        sel_nv = st.selectbox(f"👤 Nhân viên", options=["-- Chọn NV --"] + list_nv)
+
+    df_nv = df_master[df_master[C_NV] == sel_nv] if sel_nv != "-- Chọn NV --" else df_master
+
     with c2:
-        list_ht = sorted(df_step1[COL_HT].dropna().unique())
-        sel_ht = st.multiselect(f"🏢 {COL_HT}", list_ht)
+        list_ht = sorted(df_nv[C_HT].dropna().unique())
+        sel_ht = st.selectbox(f"🏢 Hệ thống", options=["-- Tất cả --"] + list_ht)
 
-    # Cấp 3: Phường (Lọc theo Hệ thống)
-    df_step2 = df_step1[df_step1[COL_HT].isin(sel_ht)] if sel_ht else df_step1
+    df_ht = df_nv[df_nv[C_HT] == sel_ht] if sel_ht != "-- Tất cả --" else df_nv
+
     with c3:
-        list_ph = sorted(df_step2[COL_PH].dropna().unique())
-        sel_ph = st.multiselect(f"📍 {COL_PH}", list_ph)
+        list_ph = sorted(df_ht[C_PH].dropna().unique())
+        sel_ph = st.selectbox(f"📍 Phường", options=["-- Tất cả --"] + list_ph)
 
-    # Cấp 4: Tên siêu thị (Lọc theo Phường)
-    df_step3 = df_step2[df_step2[COL_PH].isin(sel_ph)] if sel_ph else df_step2
+    df_ph = df_ht[df_ht[C_PH] == sel_ph] if sel_ph != "-- Tất cả --" else df_ht
+
     with c4:
-        list_st = sorted(df_step3[COL_ST].dropna().unique())
-        sel_st = st.multiselect(f"🛒 {COL_ST}", list_st)
+        list_st = sorted(df_ph[C_ST].dropna().unique())
+        sel_st = st.selectbox(f"🛒 Siêu thị", options=["-- Chọn siêu thị --"] + list_st)
 
-# 5. Kết quả lọc cuối cùng
-df_final = df_step3[df_step3[COL_ST].isin(sel_st)] if sel_st else df_step3
+    # --- 5. GIAO DIỆN NHẬP BÁO CÁO ---
+    if sel_st != "-- Chọn siêu thị --":
+        st.divider()
+        st.subheader(f"📝 Bước 2: Nhập báo cáo cho {sel_st}")
+        
+        with st.form("form_report", clear_on_submit=True):
+            col_in1, col_in2 = st.columns(2)
+            
+            with col_in1:
+                san_pham = st.text_input("📦 Sản phẩm", placeholder="VD: Sá Xị Chương Dương")
+                facing = st.number_input("📊 Facing (Mặt trưng bày)", min_value=0, step=1)
+                ton_kho = st.number_input("📉 Tồn kho (Thùng/Lon)", min_value=0, step=1)
+            
+            with col_in2:
+                hinh_anh = st.text_input("🔗 Link Hình Ảnh", placeholder="Dán link ảnh tại đây")
+                ghi_chu = st.text_area("💬 Ghi chú", placeholder="Tình trạng quầy kệ, đối thủ...")
+            
+            submit_button = st.form_submit_button("🚀 Gửi Báo Cáo")
 
-# 6. Hiển thị thông số và Bảng dữ liệu
-st.markdown("---")
-col_m1, col_m2 = st.columns(2)
-col_m1.metric("Tổng số dòng", len(df))
-col_m2.metric("Kết quả sau lọc", len(df_final))
+            if submit_button:
+                # Tạo dòng dữ liệu mới
+                new_data = pd.DataFrame([{
+                    "NGAY": datetime.now().strftime("%d/%m/%Y"),
+                    "GIO": datetime.now().strftime("%H:%M:%S"),
+                    "NHAN VIEN": sel_nv,
+                    "HE THONG": sel_ht,
+                    "PHUONG": sel_ph,
+                    "SIEU THI": sel_st,
+                    "SAN PHAM": san_pham,
+                    "FACING": facing,
+                    "TON KHO": ton_kho,
+                    "GHI CHU": ghi_chu,
+                    "HINH ANH": hinh_anh
+                }])
 
-st.dataframe(
-    df_final, 
-    use_container_width=True,
-    hide_index=True # Ẩn cột số thứ tự cho gọn
-)
+                try:
+                    # Ghi dữ liệu vào Google Sheets
+                    df_existing = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+                    updated_df = pd.concat([df_existing, new_data], ignore_index=True)
+                    conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
+                    st.success("✅ Đã gửi báo cáo thành công!")
+                except Exception as e:
+                    st.error(f"❌ Lỗi khi lưu dữ liệu: {e}")
 
-# Chân trang hiện phiên bản (Tùy chọn)
-st.caption(f"Đã cập nhật dữ liệu mới nhất | Streamlit v{st.__version__}")
+# --- 6. PHẦN DÀNH CHO BẠN THEO DÕI (ADMIN) ---
+with st.expander("📊 Xem lịch sử báo cáo thị trường"):
+    try:
+        df_view = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+        st.dataframe(df_view.tail(20), use_container_width=True)
+    except:
+        st.write("Chưa có dữ liệu báo cáo.")
