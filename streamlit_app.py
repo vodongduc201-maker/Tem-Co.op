@@ -88,7 +88,7 @@ if df_master is not None:
         new_entries = []
         for item in inputs:
             if item["F"] > 0 or item["S"] > 0:
-                # Ép tất cả dữ liệu về string và xóa dấu ngay lập tức
+                # Bước 1: Ép tất cả về chuỗi và xóa dấu ngay lập tức
                 new_entries.append({
                     "NGAY": str(now.strftime("%d/%m/%Y")),
                     "GIO": str(now.strftime("%H:%M:%S")),
@@ -101,6 +101,33 @@ if df_master is not None:
                     "GHI CHU": remove_accents(str(ghi_chu)).upper(),
                     "HINH ANH": "CO" if uploaded_file else "KHONG"
                 })
+        
+        if new_entries:
+            try:
+                # Bước 2: Đọc dữ liệu cũ (Xử lý lỗi ASCII khi đọc)
+                existing = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+                new_df = pd.DataFrame(new_entries).astype(str)
+                
+                if existing is not None and not existing.empty:
+                    # Ép dữ liệu cũ về string và xóa sạch dấu ở tiêu đề để tránh xung đột
+                    existing.columns = [remove_accents(str(c)) for c in existing.columns]
+                    existing = existing.astype(str)
+                    final_df = pd.concat([existing, new_df], ignore_index=True)
+                else:
+                    final_df = new_df
+
+                # Bước 3: BẢO HIỂM CUỐI CÙNG - Ép toàn bộ bảng về ASCII chuẩn
+                # Nếu còn sót ký tự lạ, nó sẽ bị loại bỏ thay vì gây lỗi
+                for col in final_df.columns:
+                    final_df[col] = final_df[col].apply(lambda x: str(x).encode('ascii', 'ignore').decode('ascii'))
+                
+                # Bước 4: Gửi lên Sheets
+                conn.update(worksheet="Data_Bao_Cao_MT", data=final_df)
+                st.success("✅ DA GUI THANH CONG!")
+                st.balloons()
+            except Exception as e:
+                # Nếu vẫn lỗi, in ra chi tiết để kiểm tra
+                st.error(f"LOI GUI SHEETS: {str(e)}")
         
         if new_entries:
             try:
