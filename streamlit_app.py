@@ -75,4 +75,58 @@ if df_master is not None:
         for sp in DS_SAN_PHAM:
             st.write(f"**{sp}**")
             c1, c2 = st.columns(2)
-            with c1: f = st.number_input(f"Facing", min_value=0, step=
+            with c1: f = st.number_input(f"Facing", min_value=0, step=1, key=f"f_{sp}")
+            with c2: s = st.number_input(f"Ton kho", min_value=0, step=1, key=f"s_{sp}")
+            all_entries.append({"SP": sp, "F": f, "S": s})
+        
+        st.divider()
+        uploaded_file = st.file_uploader("📸 Anh trung bay:", type=['jpg', 'png', 'jpeg'])
+        ghi_chu = st.text_area("🗒️ Ghi chu (Khong dau):")
+        submit = st.form_submit_button("🚀 GUI BAO CAO")
+
+    if submit:
+        now = datetime.now()
+        ngay = now.strftime("%d/%m/%Y")
+        gio = now.strftime("%H:%M:%S")
+        
+        new_rows = []
+        for item in all_entries:
+            if item["F"] > 0 or item["S"] > 0:
+                new_rows.append({
+                    "NGAY": str(ngay),
+                    "GIO": str(gio),
+                    "NHAN VIEN": str(nv_selected),
+                    "HE THONG": str(ht_selected),
+                    "PHUONG": str(ph_selected),
+                    "SIEU THI": str(st_selected),
+                    "SAN PHAM": str(item["SP"]),
+                    "FACING": str(item["F"]),
+                    "TON KHO": str(item["S"]),
+                    "GHI CHU": remove_accents(ghi_chu).upper(),
+                    "HINH ANH": "CO" if uploaded_file else "KHONG"
+                })
+        
+        if not new_rows:
+            st.warning("⚠️ Ban chua nhap so lieu!")
+        else:
+            try:
+                # Doc du lieu cu
+                existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+                new_df = pd.DataFrame(new_rows)
+                
+                if existing_data is not None and not existing_data.empty:
+                    # Dam bao moi cot deu la string de gop du lieu khong loi
+                    existing_data = existing_data.astype(str).dropna(axis=1, how='all')
+                    updated_df = pd.concat([existing_data, new_df], ignore_index=True)
+                else:
+                    updated_df = new_df
+                
+                # Cap nhat len Sheets (Tat ca da la khong dau)
+                conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
+                st.success("✅ Da gui bao cao thanh cong!")
+                st.balloons()
+            except Exception as e:
+                st.error(f"Loi: {str(e)}")
+
+st.markdown("---")
+st.caption("© 2026 Chuong Duong Beverage")
