@@ -3,16 +3,15 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 1. KẾT NỐI SHEETS (Mốc thành công của bạn)
+# 1. KẾT NỐI SHEETS (Lõi thành công của bạn)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. ĐỌC DANH MỤC TỪ GITHUB (Để nhân viên chọn cho nhanh)
+# 2. ĐỌC DANH MỤC TỪ GITHUB (Nhân viên, Hệ thống, Phường, Siêu thị)
 @st.cache_data(ttl=600)
 def load_master_data():
     try:
         # header=None vì file Excel của bạn bắt đầu bằng dữ liệu ngay dòng 1
         df = pd.read_excel("data nhan vien.xlsx", header=None)
-        # Gán tên cột theo đúng thứ tự A, B, C, D trong file của bạn
         df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI']
         return df
     except Exception as e:
@@ -21,48 +20,54 @@ def load_master_data():
 
 df_master = load_master_data()
 
-st.title("🥤 App Báo Cáo Thị Trường Chương Dương")
+st.title("🥤 Báo Cáo Thị Trường Chương Dương")
 
 if df_master is not None:
-    # --- PHẦN BỘ LỌC 4 CẤP (Điều hướng thông minh) ---
-    st.subheader("📍 Chọn điểm bán")
+    # --- BỘ LỌC 4 CẤP ---
+    st.subheader("📍 Thông tin điểm bán")
+    c1, c2 = st.columns(2)
     
-    # Cấp 1: Nhân viên (Cột A)
-    list_nv = sorted(df_master['NHAN VIEN'].dropna().unique())
-    sel_nv = st.selectbox("👤 1. Chọn Nhân viên", options=list_nv)
-    df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
+    with c1:
+        list_nv = sorted(df_master['NHAN VIEN'].dropna().unique())
+        sel_nv = st.selectbox("👤 1. Nhân viên", options=list_nv)
+        df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
 
-    # Cấp 2: Hệ thống (Cột B)
-    list_ht = sorted(df_f1['HE THONG'].dropna().unique())
-    sel_ht = st.selectbox("🏢 2. Chọn Hệ thống", options=list_ht)
-    df_f2 = df_f1[df_f1['HE THONG'] == sel_ht]
+        list_ht = sorted(df_f1['HE THONG'].dropna().unique())
+        sel_ht = st.selectbox("🏢 2. Hệ thống", options=list_ht)
+        df_f2 = df_f1[df_f1['HE THONG'] == sel_ht]
 
-    # Cấp 3: Phường (Cột C)
-    list_ph = sorted(df_f2['PHUONG'].dropna().unique())
-    sel_ph = st.selectbox("🏘️ 3. Chọn Phường", options=list_ph)
-    df_f3 = df_f2[df_f2['PHUONG'] == sel_ph]
+    with c2:
+        list_ph = sorted(df_f2['PHUONG'].dropna().unique())
+        sel_ph = st.selectbox("🏘️ 3. Phường", options=list_ph)
+        df_f3 = df_f2[df_f2['PHUONG'] == sel_ph]
 
-    # Cấp 4: Siêu thị (Cột D)
-    list_st = sorted(df_f3['SIEU THI'].dropna().unique())
-    sel_st = st.selectbox("🛒 4. Chọn Siêu thị", options=list_st)
+        list_st = sorted(df_f3['SIEU THI'].dropna().unique())
+        sel_st = st.selectbox("🛒 4. Siêu thị", options=list_st)
 
     st.divider()
 
-    # --- PHẦN GHI DỮ LIỆU (Giữ nguyên logic bạn đã thành công) ---
+    # --- FORM GHI DỮ LIỆU ---
     with st.form("form_bao_cao", clear_on_submit=True):
-        st.subheader(f"📝 Nhập báo cáo cho: {sel_st}")
+        st.subheader(f"📝 Báo cáo: {sel_st}")
         
-        # Các ô nhập liệu
-        san_pham = st.text_input("📦 Sản phẩm", value="Sá Xị")
-        facing = st.number_input("📊 Facing", min_value=0, step=1)
-        ton_kho = st.number_input("📉 Tồn kho", min_value=0, step=1)
-        hinh_anh = st.text_input("🔗 Link hình ảnh (Google Drive/Lark)")
-        ghi_chu = st.text_area("💬 Ghi chú thêm")
+        # DANH SÁCH SẢN PHẨM MỚI CẬP NHẬT
+        list_sp = [
+            "Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", 
+            "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"
+        ]
         
-        # NÚT BẤM QUAN TRỌNG NHẤT
+        col1, col2 = st.columns(2)
+        with col1:
+            san_pham = st.selectbox("📦 Chọn Sản phẩm", options=list_sp)
+            facing = st.number_input("📊 Facing", min_value=0, step=1)
+            ton_kho = st.number_input("📉 Tồn kho", min_value=0, step=1)
+        
+        with col2:
+            hinh_anh = st.text_input("🔗 Link hình ảnh")
+            ghi_chu = st.text_area("💬 Ghi chú")
+        
         if st.form_submit_button("🚀 Gửi báo cáo về Sheets"):
-            # 1. Tạo dòng dữ liệu mới (Gồm cả thông tin lọc và thông tin nhập)
-            new_data = pd.DataFrame([{
+            new_row = pd.DataFrame([{
                 "NGAY": datetime.now().strftime("%d/%m/%Y"),
                 "GIO": datetime.now().strftime("%H:%M:%S"),
                 "NHAN VIEN": sel_nv,
@@ -76,13 +81,12 @@ if df_master is not None:
                 "HINH ANH": hinh_anh
             }])
             
-            # 2. Thực hiện ghi vào Sheets (Logic Đọc cũ -> Nối mới -> Update)
             try:
+                # Logic ghi Sheets: Đọc -> Nối -> Update
                 df_cu = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-                df_moi = pd.concat([df_cu, new_data], ignore_index=True)
+                df_moi = pd.concat([df_cu, new_row], ignore_index=True)
                 conn.update(worksheet="Data_Bao_Cao_MT", data=df_moi)
-                st.success(f"✅ Đã ghi thành công dữ liệu tại {sel_st}!")
+                st.success(f"✅ Đã ghi thành công sản phẩm {san_pham} tại {sel_st}!")
             except Exception as e:
-                st.error(f"❌ Lỗi khi ghi vào Sheets: {e}")
-
+                st.error(f"❌ Lỗi khi lưu: {e}")
 
