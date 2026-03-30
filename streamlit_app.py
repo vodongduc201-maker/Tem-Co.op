@@ -6,7 +6,8 @@ now = datetime.now(tz)
 
 # Lấy Ngày và Giờ chuẩn Việt Nam
 now_date = now.strftime("%d/%m/%Y")
-now_time = now.strftime("%H:%M:%S")import streamlit as st
+now_time = now.strftime("%H:%M:%S")
+import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
