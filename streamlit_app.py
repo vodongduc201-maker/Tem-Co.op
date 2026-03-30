@@ -17,7 +17,7 @@ def remove_accents(text):
 def load_master_data():
     try:
         # Goi file Excel da doi ten thanh khong dau
-        df_raw = pd.read_excel("data_nhan_vien.xlsx", header=None)
+        df_raw = pd.read_excel("data nhan vien.xlsx", header=None)
         header_row = 0
         for i in range(len(df_raw)):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
