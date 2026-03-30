@@ -1,57 +1,74 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# Cấu hình trang
-st.set_page_config(page_title="Báo cáo MT", layout="wide")
+# 1. Cấu hình giao diện
+st.set_page_config(page_title="Báo cáo Chương Dương MT", layout="wide")
 
-# Kết nối dữ liệu
-conn = st.connection("gsheets", type=GSheetsConnection)
-df = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+st.title("📊 Quản lý báo cáo MT - Chương Dương")
+st.markdown("---")
 
-st.title("📊 Quản lý siêu thị theo phân cấp")
+# 2. Kết nối Google Sheets
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+    
+    # Làm sạch dữ liệu: xóa khoảng trắng ở đầu/cuối tên cột
+    df.columns = df.columns.str.strip()
+    
+except Exception as e:
+    st.error(f"❌ Không thể kết nối dữ liệu: {e}")
+    st.stop()
+
+# 3. Định nghĩa tên cột DỰA THEO ẢNH BẠN GỬI
+# Lưu ý: Trong ảnh của bạn cột siêu thị chỉ là 'SIEU THI'
+COL_NV = 'NHAN VIEN'
+COL_HT = 'HE THONG'
+COL_ST = 'SIEU THI'
 
 # --- BỘ LỌC PHÂN CẤP ---
-with st.expander("🔍 Bộ lọc tìm kiếm", expanded=True):
-    col1, col2, col3, col4 = st.columns(4)
+with st.container():
+    c1, c2, c3 = st.columns(3)
 
-    # Lọc Nhân viên
-    with col1:
-        nv_list = sorted(df['Tên nhân viên'].dropna().unique())
-        sel_nv = st.multiselect("👤 Nhân viên", nv_list)
+    # Lọc Nhân viên (Cột C trong ảnh)
+    with c1:
+        list_nv = sorted(df[COL_NV].dropna().unique())
+        sel_nv = st.multiselect(f"👤 Chọn {COL_NV}", list_nv)
     
-    # Lọc Hệ thống dựa trên Nhân viên
-    df_step1 = df[df['Tên nhân viên'].isin(sel_nv)] if sel_nv else df
-    with col2:
-        ht_list = sorted(df_step1['Hệ thống'].dropna().unique())
-        sel_ht = st.multiselect("🏢 Hệ thống", ht_list)
+    # Lọc Hệ thống (Cột D trong ảnh - dựa trên Nhân viên)
+    df_filtered = df[df[COL_NV].isin(sel_nv)] if sel_nv else df
+    with c2:
+        list_ht = sorted(df_filtered[COL_HT].dropna().unique())
+        sel_ht = st.multiselect(f"🏢 Chọn {COL_HT}", list_ht)
 
-    # Lọc Phường dựa trên Hệ thống
-    df_step2 = df_step1[df_step1['Hệ thống'].isin(sel_ht)] if sel_ht else df_step1
-    with col3:
-        ph_list = sorted(df_step2['Phường'].dropna().unique())
-        sel_ph = st.multiselect("📍 Phường", ph_list)
-
-    # Lọc Tên siêu thị dựa trên Phường
-    df_step3 = df_step2[df_step2['Phường'].isin(sel_ph)] if sel_ph else df_step2
-    with col4:
-        st_list = sorted(df_step3['Tên siêu thị'].dropna().unique())
-        sel_st = st.multiselect("🛒 Tên siêu thị", st_list)
+    # Lọc Siêu thị (Cột E trong ảnh - dựa trên Hệ thống)
+    if sel_ht:
+        df_filtered = df_filtered[df_filtered[COL_HT].isin(sel_ht)]
+    
+    with c3:
+        list_st = sorted(df_filtered[COL_ST].dropna().unique())
+        sel_st = st.multiselect(f"🛒 Chọn {COL_ST}", list_st)
 
 # Kết quả lọc cuối cùng
-df_final = df_step3[df_step3['Tên siêu thị'].isin(sel_st)] if sel_st else df_step3
+if sel_st:
+    df_final = df_filtered[df_filtered[COL_ST].isin(sel_st)]
+else:
+    df_final = df_filtered
 
-# --- HIỂN THỊ ---
-st.divider()
-st.metric("Tổng số siêu thị", len(df_final))
+# --- HIỂN THỊ THỐNG KÊ NHANH ---
+st.markdown("---")
+m1, m2, m3 = st.columns(3)
+m1.metric("Tổng số lượt viếng thăm", len(df))
+m2.metric("Số dòng sau khi lọc", len(df_final))
+# Tính tổng Facing nếu có dữ liệu
+if 'FACING' in df_final.columns:
+    total_facing = df_final['FACING'].sum()
+    m3.metric("Tổng Facing", int(total_facing))
 
-# Hiển thị bảng với tính năng sắp xếp và tìm kiếm của Streamlit mới
+# --- BẢNG DỮ LIỆU ---
 st.dataframe(
     df_final, 
     use_container_width=True,
-    column_config={
-        "Tên nhân viên": "Nhân viên",
-        "Hệ thống": "Hệ thống",
-        "Phường": "Phường",
-        "Tên siêu thị": "Siêu thị"
-    }
+    hide_index=True
 )
+
+st.caption(f"Dữ liệu cập nhật lúc: {df['NGAY'].max()} | Streamlit Engine v{st.__version__}")
