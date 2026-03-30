@@ -7,7 +7,7 @@ import unicodedata
 # 1. Cau hinh trang
 st.set_page_config(page_title="MT Team - Chuong Duong", layout="wide", page_icon="🥤")
 
-# Ham xoa dau tieng Viet (Dung de lam sach moi du lieu nhap vao)
+# Ham xoa dau tieng Viet (Dung de lam sach moi thu)
 def remove_accents(text):
     if not isinstance(text, str): return str(text)
     nfkd_form = unicodedata.normalize('NFKD', text)
@@ -16,24 +16,27 @@ def remove_accents(text):
 @st.cache_data
 def load_master_data():
     try:
-        # Goi file Excel da doi ten thanh khong dau
-        df_raw = pd.read_excel("data nhan vien.xlsx", header=None)
+        # Doc file Excel (Su dung engine openpyxl de ho tro tot hon)
+        df_raw = pd.read_excel("data nhan vien.xlsx", header=None, engine='openpyxl')
+        
+        # Tim dong tieu de
         header_row = 0
         for i in range(len(df_raw)):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
-            # Tim dong tieu de (Nhan vien/He thong)
-            if "NHAN VIEN" in row_str or "HE THONG" in row_str:
+            if "NHAN VIEN" in remove_accents(row_row_str) or "HE THONG" in remove_accents(row_str):
                 header_row = i
                 break
-        df = pd.read_excel("data nhan vien.xlsx", header=header_row)
+        
+        df = pd.read_excel("data nhan vien.xlsx", header=header_row, engine='openpyxl')
         df = df.iloc[:, :4] 
         df.columns = ["NHAN VIEN", "HE THONG", "PHUONG", "TEN SIEU THI"]
+        
+        # BUOC QUAN TRONG: Xoa sach dau ngay tu khi doc vao de tranh loi ASCII
         df = df.dropna(subset=["TEN SIEU THI"])
-        # Chuyen toan bo Master Data sang chu IN HOA khong dau
         df = df.map(lambda x: remove_accents(str(x)).strip().upper() if pd.notnull(x) else x)
         return df
     except Exception as e:
-        st.error(f"Loi: Khong tim thay file 'data_nhan_vien.xlsx' tren GitHub.")
+        st.error(f"Loi doc file: {str(e)}")
         return None
 
 df_master = load_master_data()
@@ -61,11 +64,7 @@ if df_master is not None:
         ht_selected = st.selectbox("2. He thong:", list_ht)
         df_f2 = df_f1[df_f1["HE THONG"] == ht_selected]
         
-        list_ph = sorted([x for x in df_f2["PHUONG"].unique() if x not in ['NAN', 'NONE']])
-        ph_selected = st.selectbox("3. Phuong:", list_ph)
-        
-        df_f3 = df_f2[df_f2["PHUONG"] == ph_selected]
-        st_selected = st.selectbox("4. Sieu thi:", sorted(df_f3["TEN SIEU THI"].unique()))
+        st_selected = st.selectbox("3. Sieu thi:", sorted(df_f2["TEN SIEU THI"].unique()))
 
     st.title(f"🥤 {st_selected}")
     
@@ -97,7 +96,6 @@ if df_master is not None:
                     "GIO": str(gio),
                     "NHAN VIEN": str(nv_selected),
                     "HE THONG": str(ht_selected),
-                    "PHUONG": str(ph_selected),
                     "SIEU THI": str(st_selected),
                     "SAN PHAM": str(item["SP"]),
                     "FACING": str(item["F"]),
@@ -110,23 +108,25 @@ if df_master is not None:
             st.warning("⚠️ Ban chua nhap so lieu!")
         else:
             try:
-                # Doc du lieu cu
+                # 1. Doc du lieu cu va EP KIEU STRING NGAY LAP TUC
                 existing_data = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-                new_df = pd.DataFrame(new_rows)
+                new_df = pd.DataFrame(new_rows).astype(str)
                 
                 if existing_data is not None and not existing_data.empty:
-                    # Dam bao moi cot deu la string de gop du lieu khong loi
-                    existing_data = existing_data.astype(str).dropna(axis=1, how='all')
+                    # Chuyen tieu de va noi dung cu sang String khong dau de gop cho khop
+                    existing_data.columns = [remove_accents(str(c)) for c in existing_data.columns]
+                    existing_data = existing_data.astype(str)
                     updated_df = pd.concat([existing_data, new_df], ignore_index=True)
                 else:
                     updated_df = new_df
                 
-                # Cap nhat len Sheets (Tat ca da la khong dau)
+                # 2. Cap nhat (astype(str) lan cuoi de dam bao an toan)
+                updated_df = updated_df.astype(str)
                 conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
                 st.success("✅ Da gui bao cao thanh cong!")
                 st.balloons()
             except Exception as e:
-                st.error(f"Loi: {str(e)}")
+                st.error(f"Loi gui Sheets: {str(e)}")
 
 st.markdown("---")
 st.caption("© 2026 Chuong Duong Beverage")
