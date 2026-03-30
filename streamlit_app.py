@@ -25,7 +25,7 @@ def load_master_data():
             if "NHAN VIEN" in row_str or "HE THONG" in row_str:
                 header_row = i
                 break
-        df = pd.read_excel("data_nhan_vien.xlsx", header=header_row)
+        df = pd.read_excel("data nhan vien.xlsx", header=header_row)
         df = df.iloc[:, :4] 
         df.columns = ["NHAN VIEN", "HE THONG", "PHUONG", "TEN SIEU THI"]
         df = df.dropna(subset=["TEN SIEU THI"])
