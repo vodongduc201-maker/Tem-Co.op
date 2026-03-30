@@ -85,10 +85,4 @@ if df_master is not None:
             except Exception as e:
                 st.error(f"❌ Lỗi khi ghi vào Sheets: {e}")
 
-# --- DÀNH CHO ADMIN THEO DÕI ---
-with st.expander("📊 Xem 5 báo cáo gần nhất"):
-    try:
-        df_view = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-        st.dataframe(df_view.tail(5), use_container_width=True)
-    except:
-        st.write("Chưa có dữ liệu trong Sheets.")
+
