@@ -1,83 +1,91 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-import pandas as pd
 
-# 1. Cấu hình chuyên nghiệp cho Mobile/Desktop
-st.set_page_config(page_title="Chương Dương - Check Thị Trường", layout="wide")
+# 1. Cấu hình trang chuyên nghiệp
+st.set_page_config(page_title="Chương Dương - Checklist Thị Trường", layout="wide")
 
-st.title("🥤 Giám Sát Check Thị Trường MT")
-st.info("Dữ liệu ghi nhận từ đội ngũ nhân viên đi tuyến")
+st.title("🥤 Công cụ Hỗ trợ Check Thị Trường")
+st.markdown("Chọn thông tin để tìm nhanh siêu thị bạn đang ghé thăm:")
 
 # 2. Kết nối Google Sheets
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-    # Làm sạch tên cột
+    
+    # Làm sạch tên cột (quan trọng nhất để tránh KeyError)
     df.columns = df.columns.str.strip()
+    
 except Exception as e:
-    st.error(f"Lỗi kết nối dữ liệu: {e}")
+    st.error(f"❌ Không thể kết nối dữ liệu: {e}")
     st.stop()
 
-# 3. Định nghĩa cột chuẩn theo ảnh Check-in của bạn
-COL_NGAY = 'NGAY'
-COL_GIO = 'GIO'
+# 3. Định nghĩa tên cột (Khớp với dữ liệu lúc bạn ghi thành công)
+# Mình dùng biến để nếu sau này bạn đổi tên trong Sheet thì chỉ cần sửa ở đây 1 lần
 COL_NV = 'NHAN VIEN'
 COL_HT = 'HE THONG'
+COL_PH = 'PHUONG'
 COL_ST = 'SIEU THI'
-COL_SP = 'SAN PHAM'
-COL_FC = 'FACING'
-COL_TK = 'TON KHO'
-COL_HA = 'HINH ANH'
 
-# 4. Bộ lọc thông minh cho Giám sát
-with st.sidebar:
-    st.header("🔍 Bộ Lọc Giám Sát")
-    
-    # Lọc theo Ngày
-    list_ngay = sorted(df[COL_NGAY].unique(), reverse=True)
-    sel_ngay = st.multiselect("📅 Chọn Ngày", list_ngay)
-    df_f = df[df[COL_NGAY].isin(sel_ngay)] if sel_ngay else df
+# Kiểm tra nhanh xem các cột có tồn tại không
+actual_cols = df.columns.tolist()
+for c in [COL_NV, COL_HT, COL_PH, COL_ST]:
+    if c not in actual_cols:
+        st.warning(f"⚠️ Chú ý: Cột '{c}' không tìm thấy. Hệ thống sẽ tự tạo danh sách trống.")
+        df[c] = "Chưa có dữ liệu"
 
-    # Lọc theo Nhân viên
-    list_nv = sorted(df_f[COL_NV].dropna().unique())
-    sel_nv = st.multiselect("👤 Nhân viên đi tuyến", list_nv)
-    if sel_nv: df_f = df_f[df_f[COL_NV].isin(sel_nv)]
+# 4. Giao diện Bộ lọc Phân cấp (Cascading)
+# Chúng ta dùng 4 cột để tối ưu không gian trên điện thoại/máy tính
+c1, c2, c3, c4 = st.columns(4)
 
-    # Lọc theo Hệ thống
-    list_ht = sorted(df_f[COL_HT].dropna().unique())
-    sel_ht = st.multiselect("🏢 Hệ thống", list_ht)
-    if sel_ht: df_f = df_f[df_f[COL_HT].isin(sel_ht)]
+with c1:
+    list_nv = sorted(df[COL_NV].dropna().unique())
+    sel_nv = st.selectbox(f"👤 1. Chọn {COL_NV}", options=["-- Tất cả --"] + list_nv)
 
-# 5. Hiển thị Chỉ số thị trường (KPIs)
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Số lượt Check-in", len(df_f))
-m2.metric("Số Siêu thị đã ghé", len(df_f[COL_ST].unique()))
-if COL_FC in df_f.columns:
-    m3.metric("Tổng Facing", int(df_f[COL_FC].sum()))
-if COL_TK in df_f.columns:
-    m4.metric("Tổng Tồn kho", int(df_f[COL_TK].sum()))
+# Lọc bước 1
+df_filter = df.copy()
+if sel_nv != "-- Tất cả --":
+    df_filter = df_filter[df_filter[COL_NV] == sel_nv]
 
-# 6. Hiển thị Bảng dữ liệu chi tiết
-st.subheader("📋 Chi tiết lộ trình check")
+with c2:
+    list_ht = sorted(df_filter[COL_HT].dropna().unique())
+    sel_ht = st.selectbox(f"🏢 2. Hệ thống của {sel_nv if sel_nv != '-- Tất cả --' else ''}", options=["-- Tất cả --"] + list_ht)
+
+# Lọc bước 2
+if sel_ht != "-- Tất cả --":
+    df_filter = df_filter[df_filter[COL_HT] == sel_ht]
+
+with c3:
+    list_ph = sorted(df_filter[COL_PH].dropna().unique())
+    sel_ph = st.selectbox(f"📍 3. Khu vực (Phường)", options=["-- Tất cả --"] + list_ph)
+
+# Lọc bước 3
+if sel_ph != "-- Tất cả --":
+    df_filter = df_filter[df_filter[COL_PH] == sel_ph]
+
+with c4:
+    list_st = sorted(df_filter[COL_ST].dropna().unique())
+    sel_st = st.selectbox(f"🛒 4. Chọn Siêu thị cần check", options=["-- Tất cả --"] + list_st)
+
+# Lọc bước cuối
+if sel_st != "-- Tất cả --":
+    df_final = df_filter[df_filter[COL_ST] == sel_st]
+else:
+    df_final = df_filter
+
+# 5. Hiển thị Kết quả điều hướng
+st.markdown("---")
+if sel_st != "-- Tất cả --":
+    st.success(f"✅ Bạn đang xem dữ liệu của: **{sel_st}**")
+else:
+    st.info(f"💡 Tìm thấy **{len(df_final)}** siêu thị phù hợp với lựa chọn của bạn.")
+
+# Hiển thị bảng kết quả rút gọn để nhân viên dễ nhìn
 st.dataframe(
-    df_f[[COL_NGAY, COL_GIO, COL_NV, COL_HT, COL_ST, COL_SP, COL_FC, COL_TK]], 
+    df_final[[COL_NV, COL_HT, COL_PH, COL_ST]], 
     use_container_width=True,
     hide_index=True
 )
 
-# 7. PHẦN QUAN TRỌNG: XEM ẢNH THỊ TRƯỜNG
-st.divider()
-st.subheader("📸 Hình ảnh thực tế từ điểm bán")
-
-# Chỉ hiện ảnh khi đã lọc để tránh treo máy nếu dữ liệu quá nhiều
-if len(df_f) > 100:
-    st.warning("Vui lòng lọc theo Nhân viên hoặc Ngày để xem hình ảnh chi tiết.")
-else:
-    # Tạo lưới hiển thị ảnh (3 ảnh mỗi hàng)
-    img_cols = st.columns(3)
-    for idx, row in df_f.iterrows():
-        with img_cols[idx % 3]:
-            if row[COL_HA] and str(row[COL_HA]).startswith('http'):
-                st.image(row[COL_HA], caption=f"{row[COL_ST]} ({row[COL_GIO]})", use_column_width=True)
-            else:
-                st.caption(f"🚫 {row[COL_ST]}: Không có ảnh")
+# Thêm nút bấm nhanh (Ví dụ dẫn link đến Form nhập liệu nếu bạn có)
+if sel_st != "-- Tất cả --":
+    st.button(f"Tiến hành Check-in tại {sel_st}")
