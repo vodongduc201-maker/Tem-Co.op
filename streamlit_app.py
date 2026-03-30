@@ -88,6 +88,49 @@ if df_master is not None:
         new_entries = []
         for item in inputs:
             if item["F"] > 0 or item["S"] > 0:
+                # Ép tất cả dữ liệu về string và xóa dấu ngay lập tức
+                new_entries.append({
+                    "NGAY": str(now.strftime("%d/%m/%Y")),
+                    "GIO": str(now.strftime("%H:%M:%S")),
+                    "NHAN VIEN": remove_accents(str(nv_selected)),
+                    "HE THONG": remove_accents(str(ht_selected)),
+                    "SIEU THI": remove_accents(str(st_selected)),
+                    "SAN PHAM": remove_accents(str(item["SP"])),
+                    "FACING": str(item["F"]),
+                    "TON KHO": str(item["S"]),
+                    "GHI CHU": remove_accents(str(ghi_chu)).upper(),
+                    "HINH ANH": "CO" if uploaded_file else "KHONG"
+                })
+        
+        if new_entries:
+            try:
+                # 1. Đọc dữ liệu cũ
+                existing = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+                new_df = pd.DataFrame(new_entries).astype(str)
+                
+                if existing is not None and not existing.empty:
+                    # Tẩy sạch dấu ở tiêu đề cột cũ (để tránh lệch cột)
+                    existing.columns = [remove_accents(str(c)) for c in existing.columns]
+                    existing = existing.astype(str)
+                    final_df = pd.concat([existing, new_df], ignore_index=True)
+                else:
+                    final_df = new_df
+
+                # 2. BƯỚC QUAN TRỌNG NHẤT: Ép toàn bộ bảng về ASCII 'ignore'
+                # Việc này sẽ loại bỏ mọi ký tự lạ gây ra lỗi \xc3
+                for col in final_df.columns:
+                    final_df[col] = final_df[col].apply(lambda x: str(x).encode('ascii', 'ignore').decode('ascii'))
+                
+                # 3. Gửi lên Sheets
+                conn.update(worksheet="Data_Bao_Cao_MT", data=final_df)
+                st.success("✅ GUI THANH CONG!")
+                st.balloons()
+            except Exception as e:
+                st.error(f"LOI GUI SHEETS: {str(e)}")
+        now = datetime.now()
+        new_entries = []
+        for item in inputs:
+            if item["F"] > 0 or item["S"] > 0:
                 new_entries.append({
                     "NGAY": now.strftime("%d/%m/%Y"),
                     "GIO": now.strftime("%H:%M:%S"),
