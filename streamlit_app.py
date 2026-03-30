@@ -1,4 +1,12 @@
-import streamlit as st
+import pytz  # Thêm thư viện này ở đầu file
+
+# Thiết lập múi giờ Việt Nam
+tz = pytz.timezone('Asia/Ho_Chi_Minh')
+now = datetime.now(tz)
+
+# Lấy Ngày và Giờ chuẩn Việt Nam
+now_date = now.strftime("%d/%m/%Y")
+now_time = now.strftime("%H:%M:%S")import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
