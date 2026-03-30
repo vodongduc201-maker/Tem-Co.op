@@ -1,115 +1,57 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-import unicodedata
 
-# --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Bao Cao MT - Chuong Duong", layout="wide", page_icon="🥤")
+# Cấu hình trang
+st.set_page_config(page_title="Báo cáo MT", layout="wide")
 
-# --- 2. HÀM LÀM SẠCH DỮ LIỆU (CHỐNG LỖI ASCII) ---
-def clean_text(text):
-    if not isinstance(text, str): 
-        text = str(text) if text is not None else ""
-    # Chuyển Tiếng Việt có dấu thành không dấu
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    clean = "".join([c for c in nfkd_form if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D')
-    # Loại bỏ ký tự đặc biệt gây lỗi JSON/ASCII
-    clean = clean.replace("'", "").replace('"', "").replace("\n", " ").strip()
-    return clean.encode('ascii', 'ignore').decode('ascii')
+# Kết nối dữ liệu
+conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
 
-# --- 3. KẾT NỐI GOOGLE SHEETS (ÉP XÁC THỰC) ---
-# Sử dụng ttl=0 để luôn đọc dữ liệu mới nhất và ép dùng Service Account trong Secrets
-conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
+st.title("📊 Quản lý siêu thị theo phân cấp")
 
-# --- 4. TẢI DỮ LIỆU NHÂN VIÊN (MASTER DATA) ---
-@st.cache_data(ttl=600)
-def load_master():
-    try:
-        # Đảm bảo file này có trên GitHub của bạn
-        df = pd.read_excel("data nhan vien.xlsx", engine='openpyxl')
-        return df
-    except Exception as e:
-        st.error(f"Khong tim thay file 'data nhan vien.xlsx': {e}")
-        return None
+# --- BỘ LỌC PHÂN CẤP ---
+with st.expander("🔍 Bộ lọc tìm kiếm", expanded=True):
+    col1, col2, col3, col4 = st.columns(4)
 
-df_master = load_master()
-
-# --- 5. GIAO DIỆN NHẬP LIỆU ---
-if df_master is not None:
-    st.title("🚀 HE THONG BAO CAO MT")
+    # Lọc Nhân viên
+    with col1:
+        nv_list = sorted(df['Tên nhân viên'].dropna().unique())
+        sel_nv = st.multiselect("👤 Nhân viên", nv_list)
     
-    with st.sidebar:
-        st.header("THONG TIN CHUNG")
-        nv = st.selectbox("Nhan vien:", sorted(df_master.iloc[:, 0].unique()))
-        ht = st.selectbox("He thong:", sorted(df_master.iloc[:, 1].unique()))
-        
-        # Loc danh sach sieu thi theo he thong
-        st_list = df_master[df_master.iloc[:, 1] == ht].iloc[:, 3].unique()
-        st_name = st.selectbox("Sieu thi:", sorted(st_list))
+    # Lọc Hệ thống dựa trên Nhân viên
+    df_step1 = df[df['Tên nhân viên'].isin(sel_nv)] if sel_nv else df
+    with col2:
+        ht_list = sorted(df_step1['Hệ thống'].dropna().unique())
+        sel_ht = st.multiselect("🏢 Hệ thống", ht_list)
 
-    with st.form("mt_form", clear_on_submit=True):
-        st.subheader(f"📍 Đang bao cao tai: {st_name}")
-        
-        # Danh sach san pham rut gon (de tranh loi cot)
-        list_sp = ["SA XI LON", "SA XI ZERO", "SA XI PET", "SODA KEM", "SA XI 1.5L", "NUOC SUOI"]
-        input_data = []
-        
-        col1, col2 = st.columns(2)
-        for i, sp in enumerate(list_sp):
-            with col1 if i % 2 == 0 else col2:
-                st.write(f"**{sp}**")
-                f = st.number_input("Facing", min_value=0, step=1, key=f"f_{sp}")
-                s = st.number_input("Ton kho", min_value=0, step=1, key=f"s_{sp}")
-                input_data.append({"SP": sp, "F": f, "S": s})
-        
-        st.markdown("---")
-        note = st.text_input("Ghi chu (Khong dau):")
-        submit = st.form_submit_button("📤 GUI BAO CAO")
+    # Lọc Phường dựa trên Hệ thống
+    df_step2 = df_step1[df_step1['Hệ thống'].isin(sel_ht)] if sel_ht else df_step1
+    with col3:
+        ph_list = sorted(df_step2['Phường'].dropna().unique())
+        sel_ph = st.multiselect("📍 Phường", ph_list)
 
-    # --- 6. XỬ LÝ LƯU DỮ LIỆU ---
-    if submit:
-        new_rows = []
-        for item in input_data:
-            if item["F"] > 0 or item["S"] > 0:
-                new_rows.append({
-                    "NGAY": datetime.now().strftime("%d/%m/%Y"),
-                    "GIO": datetime.now().strftime("%H:%M:%S"),
-                    "NHAN VIEN": clean_text(nv).upper(),
-                    "HE THONG": clean_text(ht).upper(),
-                    "SIEU THI": clean_text(st_name).upper(),
-                    "SAN PHAM": item["SP"],
-                    "FACING": str(item["F"]),
-                    "TON KHO": str(item["S"]),
-                    "GHI CHU": clean_text(note).upper()
-                })
-        
-        if not new_rows:
-            st.warning("Vui long nhap so luong Facing hoac Ton kho!")
-        else:
-            try:
-                # Doc du lieu cu tu Sheets
-                # Luu y: Worksheet phai ten la 'Data_Bao_Cao_MT'
-                try:
-                    existing_data = conn.read(worksheet="Data_Bao_Cao_MT")
-                except:
-                    existing_data = pd.DataFrame()
+    # Lọc Tên siêu thị dựa trên Phường
+    df_step3 = df_step2[df_step2['Phường'].isin(sel_ph)] if sel_ph else df_step2
+    with col4:
+        st_list = sorted(df_step3['Tên siêu thị'].dropna().unique())
+        sel_st = st.multiselect("🛒 Tên siêu thị", st_list)
 
-                df_new = pd.DataFrame(new_rows)
+# Kết quả lọc cuối cùng
+df_final = df_step3[df_step3['Tên siêu thị'].isin(sel_st)] if sel_st else df_step3
 
-                # Hop nhat du lieu
-                if existing_data is not None and not existing_data.empty:
-                    updated_df = pd.concat([existing_data.astype(str), df_new.astype(str)], ignore_index=True)
-                else:
-                    updated_df = df_new
+# --- HIỂN THỊ ---
+st.divider()
+st.metric("Tổng số siêu thị", len(df_final))
 
-                # Cap nhat len Google Sheets
-                conn.update(worksheet="Data_Bao_Cao_MT", data=updated_df)
-                
-                st.success("✅ GUI DU LIEU THANH CONG!")
-                st.balloons()
-            except Exception as e:
-                st.error(f"Loi ket noi Sheets: {e}")
-                st.info("Kiem tra lai: 1. Quyen Editor cho Service Account. 2. Ten Tab 'Data_Bao_Cao_MT'.")
-else:
-    st.warning("Dang tai du lieu Master... Vui long cho giay lat.")
+# Hiển thị bảng với tính năng sắp xếp và tìm kiếm của Streamlit mới
+st.dataframe(
+    df_final, 
+    use_container_width=True,
+    column_config={
+        "Tên nhân viên": "Nhân viên",
+        "Hệ thống": "Hệ thống",
+        "Phường": "Phường",
+        "Tên siêu thị": "Siêu thị"
+    }
+)
