@@ -11,7 +11,7 @@ tz = pytz.timezone('Asia/Ho_Chi_Minh')
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 3. ĐỌC DANH MỤC TỪ GITHUB (NV, HT, PH, ST)
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=0)
 def load_master_data():
     try:
         df = pd.read_excel("data nhan vien.xlsx", header=None)
