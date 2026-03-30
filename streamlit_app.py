@@ -1,20 +1,21 @@
-import streamlit as st            # Dòng 1
+import streamlit as st            
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
-import pytz                       # Thư viện xử lý múi giờ
+import pytz                       
 
-# 1. THIẾT LẬP MÚI GIỜ VIỆT NAM (Bổ sung)
+# 1. THIẾT LẬP MÚI GIỜ VIỆT NAM
 tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
 # 2. KẾT NỐI SHEETS
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. ĐỌC DANH MỤC TỪ GITHUB
+# 3. ĐỌC DANH MỤC TỪ GITHUB (NV, HT, PH, ST)
 @st.cache_data(ttl=600)
 def load_master_data():
     try:
         df = pd.read_excel("data nhan vien.xlsx", header=None)
+        # Vẫn giữ cấu trúc 4 cột A,B,C,D từ file Excel để tránh lỗi đọc data
         df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI']
         return df
     except Exception as e:
@@ -26,20 +27,29 @@ df_master = load_master_data()
 st.title("🥤 Báo Cáo Thị Trường Chương Dương")
 
 if df_master is not None:
-    # --- BỘ LỌC 4 CẤP ---
-    c1, c2, c3, c4 = st.columns(4)
+    # --- BỘ LỌC TỐI GIẢN (BỎ PHƯỜNG) ---
+    st.subheader("📍 Chọn điểm bán")
+    c1, c2, c3 = st.columns(3)
+    
     with c1:
-        sel_nv = st.selectbox("Nhân viên", options=sorted(df_master['NHAN VIEN'].unique()))
+        list_nv = sorted(df_master['NHAN VIEN'].dropna().unique())
+        sel_nv = st.selectbox("1. Nhân viên", options=list_nv)
+        df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
+
     with c2:
-        sel_ht = st.selectbox("Hệ thống", options=sorted(df_master[df_master['NHAN VIEN']==sel_nv]['HE THONG'].unique()))
+        list_ht = sorted(df_f1['HE THONG'].dropna().unique())
+        sel_ht = st.selectbox("2. Hệ thống", options=list_ht)
+        df_f2 = df_f1[df_f1['HE THONG'] == sel_ht]
+
     with c3:
-        sel_ph = st.selectbox("Phường", options=sorted(df_master[(df_master['NHAN VIEN']==sel_nv) & (df_master['HE THONG']==sel_ht)]['PHUONG'].unique()))
-    with c4:
-        sel_st = st.selectbox("Siêu thị", options=sorted(df_master[(df_master['NHAN VIEN']==sel_nv) & (df_master['PHUONG']==sel_ph)]['SIEU THI'].unique()))
+        # Lọc trực tiếp Siêu thị theo Hệ thống (Bỏ qua Phường)
+        list_st = sorted(df_f2['SIEU THI'].dropna().unique())
+        sel_st = st.selectbox("3. Siêu thị", options=list_st)
 
     st.divider()
 
-    # --- DANH SÁCH SẢN PHẨM ---
+    # --- DANH SÁCH SẢN PHẨM LIỆT KÊ ---
+    st.subheader(f"📝 Nhập số liệu: {sel_st}")
     list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
     data_inputs = {}
 
@@ -58,7 +68,7 @@ if df_master is not None:
         ghi_chu = st.text_area("💬 Ghi chú")
 
         if st.form_submit_button("🚀 Gửi báo cáo"):
-            # LẤY THỜI GIAN CHUẨN VN TẠI ĐÂY
+            # Lấy giờ VN
             now = datetime.now(tz)
             now_date = now.strftime("%d/%m/%Y")
             now_time = now.strftime("%H:%M:%S")
@@ -69,16 +79,20 @@ if df_master is not None:
                     rows_to_add.append({
                         "NGAY": now_date, "GIO": now_time,
                         "NHAN VIEN": sel_nv, "HE THONG": sel_ht,
-                        "PHUONG": sel_ph, "SIEU THI": sel_st,
+                        "PHUONG": "N/A", # Ghi chú N/A vì không chọn phường
+                        "SIEU THI": sel_st,
                         "SAN PHAM": sp, "FACING": values['fc'],
                         "TON KHO": values['tk'], "GHI CHU": ghi_chu, "HINH ANH": hinh_anh
                     })
 
             if rows_to_add:
-                df_new = pd.DataFrame(rows_to_add)
-                df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-                df_final = pd.concat([df_old, df_new], ignore_index=True)
-                conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
-                st.success(f"✅ Đã gửi thành công lúc {now_time}!")
+                try:
+                    df_new = pd.DataFrame(rows_to_add)
+                    df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+                    df_final = pd.concat([df_old, df_new], ignore_index=True)
+                    conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
+                    st.success(f"✅ Đã gửi thành công lúc {now_time}!")
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
             else:
-                st.warning("Chưa nhập số liệu.")
+                st.warning("Vui lòng nhập số liệu.")
