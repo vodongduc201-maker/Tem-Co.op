@@ -23,7 +23,7 @@ def load_master_data():
         header_row = 0
         for i in range(len(df_raw)):
             row_str = " ".join([str(x).upper() for x in df_raw.iloc[i].values])
-            if "NHAN VIEN" in remove_accents(row_row_str) or "HE THONG" in remove_accents(row_str):
+            if "NHAN VIEN" in remove_accents(row_str) or "HE THONG" in remove_accents(row_str):
                 header_row = i
                 break
         
