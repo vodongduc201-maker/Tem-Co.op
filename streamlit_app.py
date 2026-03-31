@@ -15,7 +15,6 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def load_master_data():
     try:
         df = pd.read_excel("data nhan vien.xlsx", header=None)
-        # Vẫn giữ cấu trúc 4 cột A,B,C,D từ file Excel để tránh lỗi đọc data
         df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI']
         return df
     except Exception as e:
@@ -27,7 +26,7 @@ df_master = load_master_data()
 st.title("🥤 Báo Cáo Thị Trường Chương Dương")
 
 if df_master is not None:
-    # --- BỘ LỌC TỐI GIẢN (BỎ PHƯỜNG) ---
+    # --- BỘ LỌC TỐI GIẢN ---
     st.subheader("📍 Chọn điểm bán")
     c1, c2, c3 = st.columns(3)
     
@@ -42,15 +41,21 @@ if df_master is not None:
         df_f2 = df_f1[df_f1['HE THONG'] == sel_ht]
 
     with c3:
-        # Lọc trực tiếp Siêu thị theo Hệ thống (Bỏ qua Phường)
         list_st = sorted(df_f2['SIEU THI'].dropna().unique())
         sel_st = st.selectbox("3. Siêu thị", options=list_st)
 
     st.divider()
 
-    # --- DANH SÁCH SẢN PHẨM LIỆT KÊ ---
+    # --- LOGIC LỌC SẢN PHẨM THEO HỆ THỐNG ---
     st.subheader(f"📝 Nhập số liệu: {sel_st}")
-    list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
+    
+    # Kiểm tra nếu hệ thống là BHX (Lưu ý: Viết chính xác chữ BHX như trong file Excel của bạn)
+    if sel_ht.upper() == "BHX":
+        list_sp = ["Sa Xi Lon"] # Chỉ hiện Xi Lon khi chọn BHX
+    else:
+        # Danh sách đầy đủ cho các hệ thống khác
+        list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
+    
     data_inputs = {}
 
     with st.form("form_multi_sp", clear_on_submit=True):
@@ -68,7 +73,6 @@ if df_master is not None:
         ghi_chu = st.text_area("💬 Ghi chú")
 
         if st.form_submit_button("🚀 Gửi báo cáo"):
-            # Lấy giờ VN
             now = datetime.now(tz)
             now_date = now.strftime("%d/%m/%Y")
             now_time = now.strftime("%H:%M:%S")
@@ -79,7 +83,7 @@ if df_master is not None:
                     rows_to_add.append({
                         "NGAY": now_date, "GIO": now_time,
                         "NHAN VIEN": sel_nv, "HE THONG": sel_ht,
-                        "PHUONG": "N/A", # Ghi chú N/A vì không chọn phường
+                        "PHUONG": "N/A",
                         "SIEU THI": sel_st,
                         "SAN PHAM": sp, "FACING": values['fc'],
                         "TON KHO": values['tk'], "GHI CHU": ghi_chu, "HINH ANH": hinh_anh
