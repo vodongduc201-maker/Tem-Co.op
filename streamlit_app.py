@@ -49,11 +49,17 @@ if df_master is not None:
     # --- LOGIC LỌC SẢN PHẨM THEO HỆ THỐNG ---
     st.subheader(f"📝 Nhập số liệu: {sel_st}")
     
-    # Kiểm tra nếu hệ thống là BHX (Lưu ý: Viết chính xác chữ BHX như trong file Excel của bạn)
-    if sel_ht.upper() == "BHX":
-        list_sp = ["Sa Xi Lon"] # Chỉ hiện Xi Lon khi chọn BHX
+    # Chuyển tên hệ thống sang chữ hoa để so sánh chính xác
+    ht_check = sel_ht.upper()
+
+    if ht_check == "BHX":
+        list_sp = ["Sa Xi Lon"]
+        
+    elif ht_check in ["CF", "CM", "XTRA"]:
+        list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
+        
     else:
-        # Danh sách đầy đủ cho các hệ thống khác
+        # Danh sách đầy đủ cho các hệ thống khác (Go!, Lotte, Emart...)
         list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
     
     data_inputs = {}
