@@ -70,26 +70,25 @@ if df_master is not None:
         st.subheader(f"📝 Nhập số liệu: {sel_st}")
         ht_check = sel_ht.upper().strip()
 
-        # Phân nhóm danh mục sản phẩm hiển thị
+        # 1. Nhóm Bách Hóa Xanh (1 món)
         if ht_check == "BHX":
             list_sp = ["Sa Xi Lon"]
             
+        # 2. Nhóm GS25 (3 món)
         elif ht_check == "GS25":
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390"]
             
+        # 3. Nhóm 4 món (EMART, CM, XTRA, FL, CF, SF)
         elif ht_check in ["EMART", "CM", "XTRA", "FL", "CF", "SF"]:
-            # Nhóm 4 món chủ lực
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
 
-        elif ht_check in ["GO!", "GO", "MIO"]:
-            # Nhóm 5 món cho Go! (4 món + Soda Kem Lon)
+        # 4. NHÓM 5 MÓN: GO! & MIO (Nhóm 4 + Soda Kem Lon)
+        elif ht_check in ["GO!", "GO", "BIGC", "MIO"]:
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon"]
             
         else:
-            # Nhóm đầy đủ 7 món cho các hệ thống lớn khác (Lotte, WinMart, MM, SM...)
+            # 5. Nhóm đầy đủ (Lotte, WinMart, MM, SM... - 7 món)
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
-        
-        data_inputs = {}
 
         # --- FORM NHẬP LIỆU ---
         with st.form("form_multi_sp", clear_on_submit=True):
