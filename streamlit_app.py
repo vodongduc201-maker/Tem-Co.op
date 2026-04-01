@@ -10,14 +10,22 @@ tz = pytz.timezone('Asia/Ho_Chi_Minh')
 # 2. KẾT NỐI SHEETS
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. ĐỌC DANH MỤC TỪ GITHUB (Cấu trúc 5 cột: NV, HT, PH, ST, MSKH)
+# 3. ĐỌC DANH MỤC TỪ GITHUB (Tự động thích ứng 4 hoặc 5 cột)
 @st.cache_data(ttl=600)
 def load_master_data():
     try:
-        # Đọc file Excel từ GitHub
         df = pd.read_excel("data nhan vien.xlsx", header=None)
-        # Gán tên cho 5 cột để App hiểu Cột E là MSKH
-        df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI', 'MSKH']
+        num_cols = df.shape[1] # Đếm số cột thực tế của file
+        
+        if num_cols >= 5:
+            # Nếu file có 5 cột hoặc nhiều hơn
+            df = df.iloc[:, :5] # Chỉ lấy 5 cột đầu
+            df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI', 'MSKH']
+        else:
+            # Nếu file chỉ có 4 cột cũ
+            df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI']
+            df['MSKH'] = "N/A" # Tự tạo cột MSKH giả để không lỗi logic phía sau
+            
         return df
     except Exception as e:
         st.error(f"Lỗi đọc file danh mục: {e}")
@@ -33,11 +41,9 @@ if df_master is not None:
     c1, c2, c3 = st.columns(3)
     
     with c1:
-        # Tạo danh sách nhân viên có thêm lựa chọn mặc định
         list_nv = ["Chọn nhân viên..."] + sorted(df_master['NHAN VIEN'].dropna().unique().tolist())
         sel_nv = st.selectbox("1. Nhân viên", options=list_nv)
         
-    # Chỉ hiển thị các bước tiếp theo khi đã chọn tên nhân viên cụ thể
     if sel_nv != "Chọn nhân viên...":
         df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
 
@@ -49,6 +55,8 @@ if df_master is not None:
         with c3:
             list_st = sorted(df_f2['SIEU THI'].dropna().unique())
             sel_st = st.selectbox("3. Siêu thị", options=list_st)
+            # Lấy MSKH (nếu file 4 cột thì sẽ là "N/A")
+            curr_mskh = df_f2[df_f2['SIEU THI'] == sel_st]['MSKH'].values[0]
 
         st.divider()
 
@@ -56,7 +64,6 @@ if df_master is not None:
         st.subheader(f"📝 Nhập số liệu: {sel_st}")
         ht_check = sel_ht.upper().strip()
 
-        # Phân loại danh sách sản phẩm hiển thị
         if ht_check == "BHX":
             list_sp = ["Sa Xi Lon"]
         elif ht_check in ["CF", "CM", "XTRA"]:
@@ -64,12 +71,10 @@ if df_master is not None:
         elif ht_check == "GS25":
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390"]
         else:
-            # Danh sách mặc định cho các hệ thống khác (Go!, Lotte, WinMart...)
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
         
         data_inputs = {}
 
-        # --- FORM NHẬP LIỆU ---
         with st.form("form_multi_sp", clear_on_submit=True):
             h1, h2, h3 = st.columns([2, 1, 1])
             h1.write("**Sản Phẩm**"); h2.write("**Facing**"); h3.write("**Tồn kho**")
@@ -91,7 +96,6 @@ if df_master is not None:
 
                 rows_to_add = []
                 for sp, values in data_inputs.items():
-                    # Chỉ lưu những dòng có nhập số liệu (tránh lưu rác)
                     if values['fc'] > 0 or values['tk'] > 0: 
                         rows_to_add.append({
                             "NGAY": now_date, "GIO": now_time,
@@ -103,15 +107,13 @@ if df_master is not None:
 
                 if rows_to_add:
                     try:
-                        # Đọc dữ liệu cũ và ghi đè dữ liệu mới
                         df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
                         df_final = pd.concat([df_old, pd.DataFrame(rows_to_add)], ignore_index=True)
                         conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
-                        st.success(f"✅ Đã gửi báo cáo thành công lúc {now_time}!")
+                        st.success(f"✅ Gửi thành công lúc {now_time}!")
                     except Exception as e:
-                        st.error(f"Lỗi khi gửi dữ liệu: {e}")
+                        st.error(f"Lỗi: {e}")
                 else:
-                    st.warning("Vui lòng nhập số liệu Facing hoặc Tồn kho trước khi gửi.")
+                    st.warning("Vui lòng nhập số liệu.")
     else:
-        # Thông báo khi chưa chọn nhân viên
-        st.info("👋 Chào bạn! Vui lòng chọn **Tên Nhân Viên** để bắt đầu làm báo cáo.")
+        st.info("👋 Chào bạn! Vui lòng chọn **Tên Nhân Viên** để bắt đầu.")
