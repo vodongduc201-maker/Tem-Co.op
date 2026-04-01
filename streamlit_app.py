@@ -83,7 +83,7 @@ if df_master is not None:
 
         with st.form("form_multi_sp", clear_on_submit=True):
             h1, h2, h3 = st.columns([2, 1, 1])
-            h1.write("**Sản Phẩm**"); h2.write("**Facing**"); h3.write("**Tồn kho**")
+            h1.write("**Sản Phẩm**"); h2.write("**Tồn kho**"); h3.write("**Facing**")
 
             for sp in list_sp:
                 col1, col2, col3 = st.columns([2, 1, 1])
