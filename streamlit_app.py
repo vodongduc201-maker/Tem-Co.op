@@ -81,7 +81,7 @@ if df_master is not None:
             # Nhóm 4 món chủ lực
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
 
-        elif ht_check in ["GO!", "GO", "BIGC"]:
+        elif ht_check in ["GO!", "GO", "MIO"]:
             # Nhóm 5 món cho Go! (4 món + Soda Kem Lon)
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon"]
             
