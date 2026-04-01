@@ -14,13 +14,16 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 @st.cache_data(ttl=600)
 def load_master_data():
     try:
+        # Đọc file Excel từ GitHub
         df = pd.read_excel("data nhan vien.xlsx", header=None)
         num_cols = df.shape[1] 
         
         if num_cols >= 5:
+            # Nếu file có 5 cột hoặc nhiều hơn (đã cập nhật MSKH)
             df = df.iloc[:, :5] 
             df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI', 'MSKH']
         else:
+            # Nếu file chỉ có 4 cột cũ
             df.columns = ['NHAN VIEN', 'HE THONG', 'PHUONG', 'SIEU THI']
             df['MSKH'] = "N/A" 
             
@@ -39,6 +42,7 @@ if df_master is not None:
     c1, c2, c3 = st.columns(3)
     
     with c1:
+        # Tạo danh sách nhân viên có thêm lựa chọn mặc định
         list_nv = ["Chọn nhân viên..."] + sorted(df_master['NHAN VIEN'].dropna().unique().tolist())
         sel_nv = st.selectbox("1. Nhân viên", options=list_nv)
         
@@ -46,11 +50,11 @@ if df_master is not None:
         df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
 
         with c2:
-            # Thứ tự ưu tiên hệ thống của bạn
-            priority_order = ['CM', 'EMART', 'XTRA', 'CF', 'SM', 'MM', 'SF', 'GS25', 'BHX']
+            # Thứ tự ưu tiên hệ thống: CM > EMART > XTRA > CF > SM > MM > SF > GS25 > BHX > MIO
+            priority_order = ['CM', 'EMART', 'XTRA', 'CF', 'SM', 'MM', 'SF', 'GS25', 'BHX', 'MIO']
             raw_list_ht = sorted(df_f1['HE THONG'].dropna().unique().tolist())
             
-            # Sắp xếp danh sách hệ thống theo thứ tự ưu tiên
+            # Sắp xếp danh sách hệ thống theo thứ tự ưu tiên của bạn
             list_ht = sorted(
                 raw_list_ht, 
                 key=lambda x: priority_order.index(x.upper().strip()) if x.upper().strip() in priority_order else 999
@@ -62,6 +66,7 @@ if df_master is not None:
         with c3:
             list_st = sorted(df_f2['SIEU THI'].dropna().unique())
             sel_st = st.selectbox("3. Siêu thị", options=list_st)
+            # Lấy mã số khách hàng (MSKH)
             curr_mskh = df_f2[df_f2['SIEU THI'] == sel_st]['MSKH'].values[0]
 
         st.divider()
@@ -70,25 +75,28 @@ if df_master is not None:
         st.subheader(f"📝 Nhập số liệu: {sel_st}")
         ht_check = sel_ht.upper().strip()
 
-        # 1. Nhóm Bách Hóa Xanh (1 món)
+        # Phân loại danh mục sản phẩm hiển thị
         if ht_check == "BHX":
+            # Nhóm 1 món
             list_sp = ["Sa Xi Lon"]
             
-        # 2. Nhóm GS25 (3 món)
         elif ht_check == "GS25":
+            # Nhóm 3 món
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390"]
             
-        # 3. Nhóm 4 món (EMART, CM, XTRA, FL, CF, SF)
         elif ht_check in ["EMART", "CM", "XTRA", "FL", "CF", "SF"]:
+            # Nhóm 4 món chủ lực
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
 
-        # 4. NHÓM 5 MÓN: GO! & MIO (Nhóm 4 + Soda Kem Lon)
         elif ht_check in ["GO!", "GO", "BIGC", "MIO"]:
+            # Nhóm 5 món (4 món + Soda Kem Lon)
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon"]
             
         else:
-            # 5. Nhóm đầy đủ (Lotte, WinMart, MM, SM... - 7 món)
+            # Nhóm đầy đủ 7 món cho các hệ thống khác (Lotte, WinMart, MM, SM...)
             list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
+        
+        data_inputs = {}
 
         # --- FORM NHẬP LIỆU ---
         with st.form("form_multi_sp", clear_on_submit=True):
@@ -112,6 +120,7 @@ if df_master is not None:
 
                 rows_to_add = []
                 for sp, values in data_inputs.items():
+                    # Chỉ lưu những dòng có nhập số liệu (Facing hoặc Tồn kho > 0)
                     if values['fc'] > 0 or values['tk'] > 0: 
                         rows_to_add.append({
                             "NGAY": now_date, "GIO": now_time,
@@ -123,6 +132,7 @@ if df_master is not None:
 
                 if rows_to_add:
                     try:
+                        # Đọc dữ liệu cũ và cập nhật
                         df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
                         df_final = pd.concat([df_old, pd.DataFrame(rows_to_add)], ignore_index=True)
                         conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
@@ -130,6 +140,7 @@ if df_master is not None:
                     except Exception as e:
                         st.error(f"Lỗi khi gửi dữ liệu: {e}")
                 else:
-                    st.warning("Vui lòng nhập số liệu trước khi gửi.")
+                    st.warning("Vui lòng nhập số liệu Facing hoặc Tồn kho trước khi gửi.")
     else:
+        # Thông báo khi chưa chọn nhân viên
         st.info("👋 Chào bạn! Vui lòng chọn **Tên Nhân Viên** để bắt đầu làm báo cáo.")
