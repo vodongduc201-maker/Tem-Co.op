@@ -39,15 +39,17 @@ if df_master is not None:
     list_nv = ["Chọn nhân viên..."] + sorted(df_master['NHAN VIEN'].dropna().unique().tolist())
     sel_nv = st.selectbox("1. Nhân viên", options=list_nv)
 
-    # --- Ô GHI CHÚ QUY ĐỊNH (ĐẶT NGAY DƯỚI TÊN NHÂN VIÊN) ---
-    st.info("""
-    ### 📋 QUY ĐỊNH BÁO CÁO (Đọc kỹ trước khi nhập)
-    1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. Note số lượng lẻ vào phần **Ghi chú**.
-    2. **Hết hàng:** Nhập **Facing**, KHÔNG nhập tồn. Note tình trạng vào phần **Ghi chú**.
-    3. **Điểm check-in:** Đóng cửa/Sai khu vực... vui lòng cập nhật lên **Group Báo Cáo MT**.
-    """)
-
-    if sel_nv != "Chọn nhân viên...":
+    # --- LOGIC ẨN/HIỆN Ô QUY ĐỊNH ---
+    if sel_nv == "Chọn nhân viên...":
+        # Chỉ hiển thị khi CHƯA chọn nhân viên
+        st.info("""
+        ### 📋 QUY ĐỊNH BÁO CÁO (Đọc kỹ)
+        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. Note số lượng lẻ vào phần **Ghi chú**.
+        2. **Hết hàng:** Nhập **Facing**, KHÔNG nhập tồn. Note tình trạng vào phần **Ghi chú**.
+        3. **Điểm check-in:** Đóng cửa/Sai khu vực... vui lòng cập nhật lên **Group Báo Cáo MT**.
+        """)
+    else:
+        # Khi ĐÃ chọn nhân viên: Ẩn quy định và hiện phần chọn Tuyến + Form
         df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
         
         st.divider()
@@ -55,7 +57,6 @@ if df_master is not None:
         c2, c3 = st.columns(2)
 
         with c2:
-            # Thứ tự ưu tiên hệ thống
             priority_order = ['CM', 'EMART', 'XTRA', 'CF', 'SM', 'MM', 'SF', 'GS25', 'BHX', 'MIO']
             raw_list_ht = sorted(df_f1['HE THONG'].dropna().unique().tolist())
             list_ht = sorted(raw_list_ht, key=lambda x: priority_order.index(x.upper().strip()) if x.upper().strip() in priority_order else 999)
@@ -72,7 +73,6 @@ if df_master is not None:
         st.subheader(f"📝 Nhập số liệu: {sel_st}")
         
         ht_check = sel_ht.upper().strip()
-        # Logic phân nhóm sản phẩm
         if ht_check == "BHX": list_sp = ["Sa Xi Lon"]
         elif ht_check == "GS25": list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390"]
         elif ht_check in ["EMART", "CM", "XTRA", "FL", "CF", "SF"]: list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
@@ -116,4 +116,4 @@ if df_master is not None:
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
                 else:
-                    st.warning("Vui lòng nhập số liệu.")
+                    st.warning("Vui lòng nhập ít nhất Facing hoặc Tồn kho.")
