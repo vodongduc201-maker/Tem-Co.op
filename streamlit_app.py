@@ -43,28 +43,32 @@ if df_master is not None:
     if sel_nv == "Chọn nhân viên...":
         st.info("""
         ### 📋 QUY ĐỊNH BÁO CÁO (Đọc kỹ)
-        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. GS25 nhập số lượng Lon. Note số lượng lẻ vào phần **Ghi chú**.
+        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. Note số lượng lẻ vào phần **Ghi chú**.
         2. **Hết hàng:** Nhập **Facing**, KHÔNG nhập tồn. Note tình trạng vào phần **Ghi chú**.
         3. **Điểm check-in:** Đóng cửa/Sai khu vực... vui lòng cập nhật lên **Group Báo Cáo MT**.
         """)
     else:
-        # Lấy dữ liệu đã báo cáo để hiển thị bảng tóm tắt
+        # Lấy dữ liệu hôm nay để hiển thị bảng ĐIỂM VIẾNG
         now = datetime.now(tz)
         today_str = now.strftime("%d/%m/%Y")
         
         try:
+            # Đọc data từ Google Sheets
             df_history = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-            # Lọc: Đúng tên nhân viên AND Đúng ngày hôm nay
+            # Lọc theo nhân viên và ngày hôm nay
             df_today = df_history[(df_history['NHAN VIEN'] == sel_nv) & (df_history['NGAY'] == today_str)]
         except:
             df_today = pd.DataFrame()
 
-        # HIỂN THỊ BẢNG TÓM TẮT HÔM NAY (Chỉ nhân viên đó thấy)
+        # HIỂN THỊ BẢNG ĐIỂM VIẾNG (Chỉ hiện Hệ thống & Siêu thị)
         if not df_today.empty:
-            with st.expander(f"📊 Lịch sử báo cáo hôm nay của bạn ({today_str})", expanded=False):
-                # Chỉ hiển thị các cột quan trọng cho nhân viên xem nhanh
-                summary_display = df_today[['GIO', 'HE THONG', 'SIEU THI', 'SAN PHAM', 'FACING', 'TON KHO']].sort_values(by='GIO', ascending=False)
-                st.dataframe(summary_display, use_container_width=True, hide_index=True)
+            with st.expander(f"📍 Các điểm bạn đã viếng thăm hôm nay ({today_str})", expanded=False):
+                # Loại bỏ trùng lặp để chỉ hiện tên Siêu thị, không hiện từng mặt hàng
+                summary_points = df_today[['GIO', 'HE THONG', 'SIEU THI']].drop_duplicates(subset=['SIEU THI'])
+                summary_points = summary_points.sort_values(by='GIO', ascending=False)
+                
+                # Hiển thị bảng gọn gàng
+                st.table(summary_points)
         else:
             st.caption("✨ Bạn chưa có báo cáo nào trong ngày hôm nay.")
 
@@ -129,9 +133,9 @@ if df_master is not None:
                         df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
                         df_final = pd.concat([df_old, pd.DataFrame(rows_to_add)], ignore_index=True)
                         conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
-                        st.success(f"✅ Đã gửi báo cáo thành công! Hãy tải lại trang để cập nhật lịch sử.")
-                        st.rerun() # Tự động load lại để hiện bảng lịch sử mới nhất
+                        st.success(f"✅ Đã gửi báo cáo thành công!")
+                        st.rerun() 
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
                 else:
-                    st.warning("Vui lòng nhập ít nhất Facing hoặc Tồn kho.")
+                    st.warning("Vui lòng nhập số liệu.")
