@@ -3,7 +3,33 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 import pytz
+import streamlit as st
+import streamlit.components.v1 as components
 
+# Đoạn code để biến App thành PWA (Hỗ trợ Android/iOS nhận diện Install)
+st.set_page_config(page_title="Báo Cáo Chương Dương", page_icon="🥤")
+
+components.html(
+    """
+    <script>
+    const manifest = {
+      "name": "Báo Cáo Chương Dương",
+      "short_name": "BC CD",
+      "start_url": "/",
+      "display": "standalone",
+      "icons": [{"src": "https://upload.wikimedia.org/wikipedia/vi/7/7c/Logo_Chuong_Duong.png", "sizes": "192x192", "type": "image/png"}]
+    };
+    const stringManifest = JSON.stringify(manifest);
+    const blob = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestURL;
+    document.getElementsByTagName('head')[0].appendChild(link);
+    </script>
+    """,
+    height=0,
+)
 # 1. THIẾT LẬP MÚI GIỜ VIỆT NAM
 tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
