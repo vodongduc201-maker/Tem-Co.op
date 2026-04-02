@@ -41,15 +41,33 @@ if df_master is not None:
 
     # --- LOGIC ẨN/HIỆN Ô QUY ĐỊNH ---
     if sel_nv == "Chọn nhân viên...":
-        # Chỉ hiển thị khi CHƯA chọn nhân viên
         st.info("""
         ### 📋 QUY ĐỊNH BÁO CÁO (Đọc kỹ)
-        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. Riêng GS25 báo cáo số lon. Note số lượng lẻ vào phần **Ghi chú**.
+        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. GS25 nhập số lượng Lon. Note số lượng lẻ vào phần **Ghi chú**.
         2. **Hết hàng:** Nhập **Facing**, KHÔNG nhập tồn. Note tình trạng vào phần **Ghi chú**.
         3. **Điểm check-in:** Đóng cửa/Sai khu vực... vui lòng cập nhật lên **Group Báo Cáo MT**.
         """)
     else:
-        # Khi ĐÃ chọn nhân viên: Ẩn quy định và hiện phần chọn Tuyến + Form
+        # Lấy dữ liệu đã báo cáo để hiển thị bảng tóm tắt
+        now = datetime.now(tz)
+        today_str = now.strftime("%d/%m/%Y")
+        
+        try:
+            df_history = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
+            # Lọc: Đúng tên nhân viên AND Đúng ngày hôm nay
+            df_today = df_history[(df_history['NHAN VIEN'] == sel_nv) & (df_history['NGAY'] == today_str)]
+        except:
+            df_today = pd.DataFrame()
+
+        # HIỂN THỊ BẢNG TÓM TẮT HÔM NAY (Chỉ nhân viên đó thấy)
+        if not df_today.empty:
+            with st.expander(f"📊 Lịch sử báo cáo hôm nay của bạn ({today_str})", expanded=False):
+                # Chỉ hiển thị các cột quan trọng cho nhân viên xem nhanh
+                summary_display = df_today[['GIO', 'HE THONG', 'SIEU THI', 'SAN PHAM', 'FACING', 'TON KHO']].sort_values(by='GIO', ascending=False)
+                st.dataframe(summary_display, use_container_width=True, hide_index=True)
+        else:
+            st.caption("✨ Bạn chưa có báo cáo nào trong ngày hôm nay.")
+
         df_f1 = df_master[df_master['NHAN VIEN'] == sel_nv]
         
         st.divider()
@@ -83,7 +101,7 @@ if df_master is not None:
 
         with st.form("form_multi_sp", clear_on_submit=True):
             h1, h2, h3 = st.columns([2, 1, 1])
-            h1.write("**Sản Phẩm**"); h2.write("**Tồn kho**"); h3.write("**Facing**")
+            h1.write("**Sản Phẩm**"); h2.write("**Facing**"); h3.write("**Tồn kho**")
 
             for sp in list_sp:
                 col1, col2, col3 = st.columns([2, 1, 1])
@@ -96,12 +114,11 @@ if df_master is not None:
             ghi_chu = st.text_area("💬 Ghi chú", placeholder="Ghi số lẻ hoặc tình trạng hết hàng tại đây...")
 
             if st.form_submit_button("🚀 Gửi báo cáo"):
-                now = datetime.now(tz)
                 rows_to_add = []
                 for sp, values in data_inputs.items():
                     if values['fc'] > 0 or values['tk'] > 0: 
                         rows_to_add.append({
-                            "NGAY": now.strftime("%d/%m/%Y"), "GIO": now.strftime("%H:%M:%S"),
+                            "NGAY": today_str, "GIO": now.strftime("%H:%M:%S"),
                             "NHAN VIEN": sel_nv, "HE THONG": sel_ht, "PHUONG": "N/A", "SIEU THI": sel_st,
                             "SAN PHAM": sp, "FACING": values['fc'], "TON KHO": values['tk'],
                             "GHI CHU": ghi_chu, "HINH ANH": hinh_anh
@@ -112,7 +129,8 @@ if df_master is not None:
                         df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
                         df_final = pd.concat([df_old, pd.DataFrame(rows_to_add)], ignore_index=True)
                         conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
-                        st.success(f"✅ Đã gửi báo cáo thành công!")
+                        st.success(f"✅ Đã gửi báo cáo thành công! Hãy tải lại trang để cập nhật lịch sử.")
+                        st.rerun() # Tự động load lại để hiện bảng lịch sử mới nhất
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
                 else:
