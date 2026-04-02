@@ -44,7 +44,7 @@ if df_master is not None:
         # Chỉ hiển thị khi CHƯA chọn nhân viên
         st.info("""
         ### 📋 QUY ĐỊNH BÁO CÁO (Đọc kỹ)
-        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. Note số lượng lẻ vào phần **Ghi chú**.
+        1. **Tồn kho:** Nếu dưới 1/2 thùng => Nhập **Tồn = 0**. Riêng GS25 báo cáo số lon. Note số lượng lẻ vào phần **Ghi chú**.
         2. **Hết hàng:** Nhập **Facing**, KHÔNG nhập tồn. Note tình trạng vào phần **Ghi chú**.
         3. **Điểm check-in:** Đóng cửa/Sai khu vực... vui lòng cập nhật lên **Group Báo Cáo MT**.
         """)
