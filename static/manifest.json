@@ -1,0 +1,16 @@
+{
+  "name": "Báo Cáo Chương Dương",
+  "short_name": "BC Chương Dương",
+  "description": "Hệ thống báo cáo thị trường Modern Trade",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff0000",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/vi/7/7c/Logo_Chuong_Duong.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
