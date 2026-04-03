@@ -156,9 +156,18 @@ if df_master is not None:
 
                 if rows_to_add:
                     try:
+                        # 1. Đọc dữ liệu cũ từ Sheets về
                         df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
-                        df_final = pd.concat([df_old, pd.DataFrame(rows_to_add)], ignore_index=True)
+                        
+                        # 2. Chuyển dữ liệu vừa nhập (rows_to_add) thành DataFrame
+                        df_new_input = pd.DataFrame(rows_to_add)
+                        
+                        # 3. GHÉP: Mới ở TRÊN, Cũ ở DƯỚI
+                        df_final = pd.concat([df_new_input, df_old], ignore_index=True)
+                        
+                        # 4. Ghi đè lại lên Google Sheets
                         conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
+                        
                         st.success(f"✅ Đã gửi báo cáo thành công!")
                         st.rerun() 
                     except Exception as e:
