@@ -144,31 +144,48 @@ if df_master is not None:
             ghi_chu = st.text_area("💬 Ghi chú", placeholder="Ghi số lẻ hoặc tình trạng hết hàng tại đây...")
 
             if st.form_submit_button("🚀 Gửi báo cáo"):
+                now = datetime.now(tz)
                 rows_to_add = []
+                
+                # --- LOGIC TỰ ĐỘNG LẤY TÊN PHƯỜNG ---
+                # Tìm dòng tương ứng với Siêu thị đang chọn trong file Master để lấy tên Phường
+                try:
+                    thong_tin_st = df_f2[df_f2['SIEU THI'] == sel_st].iloc[0]
+                    ten_phuong = thong_tin_st['PHUONG'] 
+                except:
+                    ten_phuong = "N/A" # Phòng hờ nếu không tìm thấy
+
                 for sp, values in data_inputs.items():
                     if values['fc'] > 0 or values['tk'] > 0: 
                         rows_to_add.append({
-                            "NGAY": today_str, "GIO": now.strftime("%H:%M:%S"),
-                            "NHAN VIEN": sel_nv, "HE THONG": sel_ht, "PHUONG": "N/A", "SIEU THI": sel_st,
-                            "SAN PHAM": sp, "FACING": values['fc'], "TON KHO": values['tk'],
-                            "GHI CHU": ghi_chu, "HINH ANH": hinh_anh
+                            "NGAY": today_str, 
+                            "GIO": now.strftime("%H:%M:%S"),
+                            "NHAN VIEN": sel_nv, 
+                            "HE THONG": sel_ht, 
+                            "PHUONG": ten_phuong, # Đã tự động lấy từ file Excel
+                            "SIEU THI": sel_st,
+                            "SAN PHAM": sp, 
+                            "FACING": values['fc'], 
+                            "TON KHO": values['tk'],
+                            "GHI CHU": ghi_chu, 
+                            "HINH ANH": hinh_anh
                         })
 
                 if rows_to_add:
                     try:
-                        # 1. Đọc dữ liệu cũ từ Sheets về
+                        # Đọc dữ liệu cũ
                         df_old = conn.read(worksheet="Data_Bao_Cao_MT", ttl=0)
                         
-                        # 2. Chuyển dữ liệu vừa nhập (rows_to_add) thành DataFrame
+                        # Chuyển dữ liệu mới thành DataFrame
                         df_new_input = pd.DataFrame(rows_to_add)
                         
-                        # 3. GHÉP: Mới ở TRÊN, Cũ ở DƯỚI
+                        # Ghép mới lên trên cũ
                         df_final = pd.concat([df_new_input, df_old], ignore_index=True)
                         
-                        # 4. Ghi đè lại lên Google Sheets
+                        # Cập nhật lên Sheets
                         conn.update(worksheet="Data_Bao_Cao_MT", data=df_final)
                         
-                        st.success(f"✅ Đã gửi báo cáo thành công!")
+                        st.success(f"✅ Đã gửi báo cáo cho {sel_st} ({ten_phuong})!")
                         st.rerun() 
                     except Exception as e:
                         st.error(f"Lỗi: {e}")
