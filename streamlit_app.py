@@ -105,7 +105,7 @@ if df_master is not None:
         c2, c3 = st.columns(2)
 
         with c2:
-            priority_order = ['CM', 'EMART', 'XTRA', 'CF', 'SM', 'MM', 'SF', 'GS25', 'BHX', 'MIO']
+            priority_order = ['CM', 'EMART', 'CF', 'SM', 'MM', 'SF', 'GS25', 'BHX', 'MIO']
             raw_list_ht = sorted(df_f1['HE THONG'].dropna().unique().tolist())
             list_ht = sorted(raw_list_ht, key=lambda x: priority_order.index(x.upper().strip()) if x.upper().strip() in priority_order else 999)
             sel_ht = st.selectbox("2. Hệ thống", options=list_ht)
@@ -123,7 +123,7 @@ if df_master is not None:
         ht_check = sel_ht.upper().strip()
         if ht_check == "BHX": list_sp = ["Sa Xi Lon"]
         elif ht_check == "GS25": list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390"]
-        elif ht_check in ["EMART", "CS", "CM", "XTRA", "FL", "CF"]: list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
+        elif ht_check in ["EMART", "CS", "CM", "CF"]: list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L"]
         elif ht_check in ["GO!", "GO", "BIGC", "MIO"]: list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon"]
         else: list_sp = ["Sa Xi Lon", "Sa Xi Zero Lon", "Xi Pet 390", "Xi Pet 1.5L", "Soda Kem Lon", "Suoi 500mL", "Soda Lon"]
         
